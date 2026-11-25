@@ -1,0 +1,97 @@
+<view class="page">
+  <view class="card" wx:if="{{loading}}">
+    <view class="empty">加载中…</view>
+  </view>
+
+  <view class="card" wx:elif="{{!bound}}">
+    <view class="title">尚未绑定</view>
+    <view class="subtitle">绑定后即可查看你的个人排班</view>
+    <button class="btn" style="margin-top: 24rpx;" bindtap="goBind">输入邀请码绑定</button>
+  </view>
+
+  <view class="card" wx:elif="{{errorMsg}}">
+    <view class="empty">{{errorMsg}}</view>
+    <button class="btn btn-secondary" bindtap="retry">重试</button>
+  </view>
+
+  <block wx:else>
+    <view class="head row-between">
+      <view>
+        <view class="title">{{teamName}}</view>
+        <view class="muted" wx:if="{{lastPublishedAt}}">最后发布 {{lastPublishedAt}}</view>
+        <view class="muted" wx:else>暂无已发布排班</view>
+      </view>
+      <view class="muted" wx:if="{{hasAnyShift}}">下拉刷新</view>
+    </view>
+
+    <!-- 下一班 / 当前班次 -->
+    <view class="card next-card" wx:if="{{nextShift}}">
+      <view class="row-between">
+        <view>
+          <view class="next-label">{{nextShift.dateText}}</view>
+          <view class="next-title">{{nextShift.title}}</view>
+          <view class="next-time">{{nextShift.timeText}}</view>
+        </view>
+        <view class="tag" wx:if="{{nextShift.ongoing}}">进行中</view>
+        <view class="tag tag-muted" wx:elif="{{nextShift.localAdded}}">本机已添加</view>
+      </view>
+      <button
+        wx:if="{{nextShift.canAdd && !nextShift.localAdded}}"
+        class="btn btn-secondary btn-sm next-btn"
+        bindtap="onAddNext"
+      >
+        添加到手机日历（提前 30 分钟）
+      </button>
+    </view>
+
+    <!-- 旧提醒处理 -->
+    <view class="notice" wx:for="{{staleNotices}}" wx:key="workDate" bindtap="onDismissStale">
+      <view>{{item.text}}</view>
+      <view class="muted" style="margin-top: 6rpx;">原提醒：{{item.oldTimeText}}</view>
+    </view>
+
+    <!-- 周视图 -->
+    <view class="card week" wx:for="{{weeks}}" wx:for-item="week" wx:key="weekStart">
+      <view class="week-head row-between">
+        <view class="week-label">{{week.label}}</view>
+        <view class="muted">{{week.weekStart}}</view>
+      </view>
+      <view
+        class="day {{day.isToday ? 'day-today' : ''}}"
+        wx:for="{{week.days}}"
+        wx:for-item="day"
+        wx:key="date"
+      >
+        <view class="day-left">
+          <view class="day-date">{{day.label}}</view>
+          <view class="muted" wx:if="{{day.empty}}">未排班</view>
+          <block wx:for="{{day.shifts}}" wx:for-item="s" wx:key="workDate">
+            <view class="shift-title">{{s.label}}</view>
+            <view class="muted">{{s.timeText}}</view>
+            <view class="row" style="margin-top: 6rpx; gap: 12rpx;">
+              <view class="tag tag-success" wx:if="{{s.ongoing}}">进行中</view>
+              <view class="tag tag-muted" wx:elif="{{s.ended}}">已结束</view>
+              <view class="tag tag-muted" wx:elif="{{s.localAdded}}">本机已添加</view>
+              <view class="tag tag-warn" wx:elif="{{s.localStale}}">旧提醒待清理</view>
+              <view class="tag tag-muted" wx:elif="{{s.category === 'OFF'}}">不提醒</view>
+            </view>
+          </block>
+        </view>
+        <view class="day-right">
+          <button
+            wx:if="{{!day.empty && day.shifts[0].canAdd}}"
+            class="btn btn-ghost btn-sm"
+            data-date="{{day.date}}"
+            bindtap="onAddToCalendar"
+          >
+            {{day.shifts[0].localAdded ? '重新添加' : '加日历'}}
+          </button>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty" wx:if="{{!hasAnyShift}}">
+      本周和下周暂无已发布的工作班次
+    </view>
+  </block>
+</view>

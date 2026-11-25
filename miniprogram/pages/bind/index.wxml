@@ -1,0 +1,49 @@
+<view class="page">
+  <view class="card" wx:if="{{state === 'CHECKING'}}">
+    <view class="empty">正在检查绑定状态…</view>
+  </view>
+
+  <view class="card" wx:elif="{{state === 'ERROR'}}">
+    <view class="empty">{{errorMsg}}</view>
+    <button class="btn btn-secondary" bindtap="retry">重试</button>
+  </view>
+
+  <view class="card" wx:elif="{{state === 'BOUND'}}">
+    <view class="title">已绑定</view>
+    <view class="subtitle">{{employeeText}}</view>
+    <view class="notice" style="margin-top: 20rpx;">
+      如需更换、解绑或重新绑定，请联系管理员处理，不能通过重新导入排班图触发。
+    </view>
+    <button class="btn" bindtap="goSchedule">查看我的排班</button>
+  </view>
+
+  <block wx:else>
+    <view class="card">
+      <view class="title">绑定个人排班</view>
+      <view class="subtitle">请输入管理员单独发给你的邀请码</view>
+      <input
+        class="input"
+        style="margin-top: 24rpx;"
+        type="text"
+        maxlength="32"
+        placeholder="邀请码"
+        value="{{code}}"
+        bindinput="onInput"
+        confirm-type="done"
+        bindconfirm="onSubmit"
+      />
+      <button
+        class="btn"
+        style="margin-top: 24rpx;"
+        loading="{{submitting}}"
+        disabled="{{submitting || !code}}"
+        bindtap="onSubmit"
+      >
+        绑定
+      </button>
+    </view>
+    <view class="muted" style="padding: 0 12rpx;">
+      邀请码一次有效，默认 48 小时内有效。输入工号或姓名无法完成绑定。
+    </view>
+  </block>
+</view>

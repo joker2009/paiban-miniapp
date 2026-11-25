@@ -1,0 +1,58 @@
+<view class="page">
+  <view class="card">
+    <view class="title">{{weekStart}} 所在周</view>
+    <view class="subtitle">同一批次只支持一个团队、一个自然周；混入不同周的图请拆成两个任务。</view>
+
+    <button class="btn" style="margin-top: 24rpx;" bindtap="chooseFromChat" disabled="{{uploading}}">
+      从微信聊天选图
+    </button>
+    <button class="btn btn-ghost" style="margin-top: 16rpx;" bindtap="chooseFromAlbum" disabled="{{uploading}}">
+      从相册选图
+    </button>
+    <view class="muted" style="margin-top: 16rpx; text-align: center;">
+      每批 {{maxCount}} 张以内，单图不超过 {{maxSizeText}}
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{files.length > 0}}">
+    <view class="row-between">
+      <view class="title">已选 {{files.length}} 张</view>
+      <view class="muted">顺序影响识别分页</view>
+    </view>
+
+    <view class="file list-item" wx:for="{{files}}" wx:key="path">
+      <view class="row-between">
+        <view class="file-main">
+          <view class="file-name">{{index + 1}}. {{item.name}}</view>
+          <view class="muted">{{item.sizeText}}</view>
+        </view>
+        <view class="file-actions" wx:if="{{!uploading}}">
+          <text class="mini" bindtap="moveUp" data-index="{{index}}">上移</text>
+          <text class="mini" bindtap="moveDown" data-index="{{index}}">下移</text>
+          <text class="mini danger" bindtap="removeFile" data-index="{{index}}">移除</text>
+        </view>
+      </view>
+    </view>
+
+    <button
+      class="btn"
+      style="margin-top: 24rpx;"
+      bindtap="onSubmit"
+      loading="{{uploading}}"
+      disabled="{{uploading}}"
+    >
+      上传并提交识别
+    </button>
+    <view class="muted" style="text-align: center; margin-top: 12rpx;" wx:if="{{progressText}}">
+      {{progressText}}
+    </view>
+  </view>
+
+  <view class="card" wx:else>
+    <view class="empty">还未选择图片</view>
+  </view>
+
+  <view class="muted" style="padding: 0 12rpx;">
+    原图仅管理员可见，默认最多保留 7 天；已发布排班不受影响。取消选图不会创建任务。
+  </view>
+</view>

@@ -1,0 +1,144 @@
+.img-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid var(--border);
+}
+
+.img-row:last-child {
+  border-bottom: none;
+}
+
+.img-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.img-name {
+  font-size: 26rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.img-actions {
+  display: flex;
+  gap: 24rpx;
+}
+
+.mini {
+  font-size: 24rpx;
+  color: var(--brand);
+}
+
+.mini.danger {
+  color: var(--danger);
+}
+
+.unmatched-text {
+  flex: 1;
+  font-size: 26rpx;
+}
+
+.tabs {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.tab {
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  background: #f0f1f3;
+  font-size: 26rpx;
+  color: var(--text-weak);
+}
+
+.tab-active {
+  background: var(--brand-weak);
+  color: var(--brand);
+  font-weight: 500;
+}
+
+.cell-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cell-emp {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.cell-shift {
+  flex-shrink: 0;
+  padding-left: 16rpx;
+}
+
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 101;
+  background: #fff;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 32rpx 24rpx calc(48rpx + env(safe-area-inset-bottom));
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.sheet-head {
+  margin-bottom: 24rpx;
+}
+
+.shift-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.shift-btn {
+  width: calc(33.333% - 12rpx);
+  box-sizing: border-box;
+  padding: 20rpx 12rpx;
+  border-radius: 16rpx;
+  background: #f7f8fa;
+  border: 1rpx solid var(--border);
+  text-align: center;
+  font-size: 28rpx;
+}
+
+.diff-grid {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+
+.diff-item {
+  flex: 1;
+  text-align: center;
+  background: #f7f8fa;
+  border-radius: 16rpx;
+  padding: 20rpx 0;
+}
+
+.diff-num {
+  font-size: 40rpx;
+  font-weight: 600;
+  color: var(--brand);
+}
+
+.blocker {
+  font-size: 24rpx;
+  margin-top: 6rpx;
+  word-break: break-all;
+}

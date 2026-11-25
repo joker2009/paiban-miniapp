@@ -1,0 +1,72 @@
+<view class="page">
+  <view class="card" wx:if="{{loading && !teamId}}">
+    <view class="empty">加载中…</view>
+  </view>
+
+  <view class="card" wx:elif="{{noAccess}}">
+    <view class="title">无管理权限</view>
+    <view class="subtitle">当前账号未被授权为任何团队的排班管理员。如需开通，请联系部署方。</view>
+  </view>
+
+  <block wx:else>
+    <view class="card">
+      <view class="row-between">
+        <picker range="{{teams}}" range-key="teamName" value="{{teamIndex}}" bindchange="onTeamChange" disabled="{{teams.length <= 1}}">
+          <view class="title">{{teamName}} <text class="muted" wx:if="{{teams.length > 1}}">切换 ▾</text></view>
+        </picker>
+        <view class="tag" wx:if="{{currentVersion > 0}}">已发布 v{{currentVersion}}</view>
+        <view class="tag tag-muted" wx:else>尚未发布</view>
+      </view>
+      <view class="muted" wx:if="{{lastPublishedAt}}">最后发布 {{lastPublishedAt}}</view>
+
+      <view class="divider"></view>
+
+      <view class="row-between">
+        <view class="week-nav" bindtap="prevWeek">‹ 上一周</view>
+        <view class="week-cur">{{weekLabel}}</view>
+        <view class="week-nav" bindtap="nextWeek">下一周 ›</view>
+      </view>
+    </view>
+
+    <view class="entry-grid">
+      <view class="entry" bindtap="goImport">
+        <view class="entry-icon">＋</view>
+        <view>导入排班图</view>
+      </view>
+      <view class="entry" bindtap="goShifts">
+        <view class="entry-icon">≡</view>
+        <view>班次字典</view>
+      </view>
+      <view class="entry" bindtap="goMembers">
+        <view class="entry-icon">◎</view>
+        <view>成员管理</view>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="row-between">
+        <view class="title">本周导入任务</view>
+        <view class="muted" bindtap="loadWeek">刷新</view>
+      </view>
+
+      <view class="empty" wx:if="{{!loading && jobs.length === 0}}">本周还没有导入任务</view>
+      <view class="empty" wx:elif="{{loading && jobs.length === 0}}">加载中…</view>
+
+      <view class="job list-item" wx:for="{{jobs}}" wx:key="_id" data-jobid="{{item._id}}" bindtap="openJob">
+        <view class="row-between">
+          <view>
+            <view class="job-title">{{item.images.length}} 张图 · {{item.weekStart}}</view>
+            <view class="muted">更新于 {{item.updatedText}}</view>
+          </view>
+          <view class="tag {{item.statusClass}}">{{item.statusLabel}}</view>
+        </view>
+        <view class="muted" wx:if="{{item.error}}" style="color: var(--danger); margin-top: 8rpx;">{{item.error}}</view>
+      </view>
+    </view>
+
+    <view class="card" wx:if="{{errorMsg}}">
+      <view class="empty">{{errorMsg}}</view>
+      <button class="btn btn-secondary" bindtap="retry">重试</button>
+    </view>
+  </block>
+</view>

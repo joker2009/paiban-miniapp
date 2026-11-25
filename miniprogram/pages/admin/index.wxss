@@ -1,0 +1,36 @@
+.week-nav {
+  padding: 12rpx 16rpx;
+  color: var(--brand);
+  font-size: 26rpx;
+}
+
+.week-cur {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.entry-grid {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.entry {
+  flex: 1;
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 24rpx 12rpx;
+  text-align: center;
+  font-size: 26rpx;
+  box-shadow: 0 2rpx 8rpx rgba(16, 24, 40, 0.04);
+}
+
+.entry-icon {
+  font-size: 40rpx;
+  color: var(--brand);
+  margin-bottom: 6rpx;
+}
+
+.job-title {
+  font-size: 28rpx;
+}

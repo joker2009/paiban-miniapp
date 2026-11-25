@@ -1,0 +1,174 @@
+<view class="page">
+  <view class="card" wx:if="{{loading}}">
+    <view class="empty">加载中…</view>
+  </view>
+
+  <view class="card" wx:elif="{{errorMsg}}">
+    <view class="empty">{{errorMsg}}</view>
+    <button class="btn btn-secondary" bindtap="retry">重试</button>
+  </view>
+
+  <block wx:else>
+    <!-- 任务概况 -->
+    <view class="card">
+      <view class="row-between">
+        <view>
+          <view class="title">{{weekStart}} 所在周</view>
+          <view class="muted">任务 {{jobId}}</view>
+        </view>
+        <view class="tag {{issueCount > 0 ? 'tag-warn' : 'tag-success'}}">{{jobStatusText}}</view>
+      </view>
+      <view class="divider"></view>
+      <view class="row-between">
+        <view class="muted">待校对 {{issueCount}} 项</view>
+        <view class="muted" wx:if="{{job.status === 'RECOGNIZING'}}">识别中，可稍后刷新</view>
+      </view>
+      <view class="notice notice-danger" wx:if="{{issueCount > 0}}" style="margin-top: 16rpx;">
+        存在未解决异常，修复前无法发布。空白单元格需人工确认「未排班」。
+      </view>
+      <button
+        class="btn"
+        style="margin-top: 20rpx;"
+        bindtap="onPreviewRelease"
+        disabled="{{busy || issueCount > 0 || (job.status !== 'NEEDS_REVIEW' && job.status !== 'READY')}}"
+      >
+        预览差异并发布
+      </button>
+    </view>
+
+    <!-- 原图 -->
+    <view class="card" wx:if="{{job.images.length > 0}}">
+      <view class="title">原图与识别进度</view>
+      <view class="img-row" wx:for="{{job.images}}" wx:key="id">
+        <view class="img-info">
+          <view class="img-name">{{item.name}}</view>
+          <view class="muted" wx:if="{{item.status === 'OCR_FAILED'}}" style="color: var(--danger);">
+            {{item.error || '识别失败'}}
+          </view>
+          <view class="muted" wx:else>{{item.status}}</view>
+        </view>
+        <view class="img-actions">
+          <text class="mini" data-id="{{item.id}}" bindtap="previewImage">查看</text>
+          <text class="mini danger" wx:if="{{item.status === 'OCR_FAILED'}}" data-id="{{item.id}}" bindtap="retryImage">重试</text>
+          <text class="mini" wx:if="{{item.status === 'OCR_FAILED'}}" data-id="{{item.id}}" bindtap="removeImage">移除</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 未匹配员工行 -->
+    <view class="card" wx:if="{{unmatchedRows.length > 0}}">
+      <view class="title">未匹配员工（{{unmatchedRows.length}} 行）</view>
+      <view class="muted">仅在花名册内按工号精确匹配；请先关联，再处理单元格。</view>
+      <view class="row list-item" wx:for="{{unmatchedRows}}" wx:key="rowKey">
+        <view class="unmatched-text">
+          <view>工号 {{item.employeeNo || '（缺失）'}}</view>
+          <view class="muted">{{item.employeeName || '姓名未知'}} · {{item.cellCount}} 个单元格</view>
+        </view>
+        <picker
+          range="{{employees}}"
+          range-key="name"
+          data-rowkey="{{item.rowKey}}"
+          bindchange="onLinkRow"
+        >
+          <view class="tag">关联员工</view>
+        </picker>
+      </view>
+    </view>
+
+    <!-- 单元格筛选 -->
+    <view class="card">
+      <view class="tabs">
+        <view
+          class="tab {{filterKey === item.key ? 'tab-active' : ''}}"
+          wx:for="{{filters}}"
+          wx:key="key"
+          data-key="{{item.key}}"
+          bindtap="onFilter"
+        >
+          {{item.label}}
+        </view>
+      </view>
+
+      <view class="empty" wx:if="{{cells.length === 0}}">
+        {{filterKey === 'ISSUE' ? '没有待校对项' : '暂无数据'}}
+      </view>
+
+      <view
+        class="cell list-item {{item.needsReview ? 'cell-issue' : ''}}"
+        wx:for="{{cells}}"
+        wx:key="_id"
+        data-id="{{item._id}}"
+        bindtap="openCell"
+      >
+        <view class="row-between">
+          <view class="cell-main">
+            <view class="cell-emp">{{item.employeeText}}</view>
+            <view class="muted">{{item.dateText}} · 原文「{{item.rawText}}」</view>
+            <view class="muted" wx:if="{{item.issuesText}}" style="color: var(--warning);">
+              {{item.issuesText}}
+            </view>
+          </view>
+          <view class="cell-shift">
+            <view class="tag {{item.needsReview ? 'tag-warn' : 'tag-success'}}">{{item.shiftLabel}}</view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>
+
+<!-- 班次选择弹层 -->
+<view class="mask" wx:if="{{shiftModal.visible}}" bindtap="closeShiftModal"></view>
+<view class="sheet" wx:if="{{shiftModal.visible}}">
+  <view class="sheet-head">
+    <view class="title">选择班次</view>
+    <view class="muted">{{shiftModal.employeeText}} · {{shiftModal.dateText}} · 原文「{{shiftModal.rawText}}」</view>
+    <view class="muted">当前：{{shiftModal.currentLabel}}</view>
+  </view>
+  <view class="shift-grid">
+    <view
+      class="shift-btn"
+      wx:for="{{shiftOptions}}"
+      wx:key="code"
+      data-code="{{item.code}}"
+      bindtap="pickShift"
+    >
+      <view>{{item.label}}</view>
+      <view class="muted">{{item.category === 'OFF' ? '不提醒' : (item.startLocal || '') + (item.endLocal ? ' - ' + item.endLocal : '')}}</view>
+    </view>
+  </view>
+  <button class="btn btn-secondary" style="margin-top: 20rpx;" bindtap="markCleared">确认未排班（清除）</button>
+  <button class="btn btn-ghost" style="margin-top: 12rpx;" bindtap="closeShiftModal">取消</button>
+</view>
+
+<!-- 发布预览弹层 -->
+<view class="mask" wx:if="{{previewModal.visible}}" bindtap="closePreview"></view>
+<view class="sheet" wx:if="{{previewModal.visible}}">
+  <view class="sheet-head">
+    <view class="title">发布预览</view>
+    <view class="muted">基线版本 v{{previewModal.preview.baseVersion}}</view>
+  </view>
+  <view class="diff-grid" wx:if="{{previewModal.preview}}">
+    <view class="diff-item"><view class="diff-num">{{previewModal.preview.added}}</view><view class="muted">新增</view></view>
+    <view class="diff-item"><view class="diff-num">{{previewModal.preview.modified}}</view><view class="muted">修改</view></view>
+    <view class="diff-item"><view class="diff-num">{{previewModal.preview.removed}}</view><view class="muted">删除</view></view>
+    <view class="diff-item"><view class="diff-num">{{previewModal.preview.unchanged}}</view><view class="muted">不变</view></view>
+  </view>
+  <view class="notice notice-danger" wx:if="{{previewModal.preview.blockers.length > 0}}">
+    <view>存在 {{previewModal.preview.blockers.length}} 个阻断项，请先处理：</view>
+    <block wx:for="{{previewModal.preview.blockers}}" wx:key="reason">
+      <view class="blocker" wx:if="{{index < 5}}">· {{item.reason}}</view>
+    </block>
+    <view class="blocker" wx:if="{{previewModal.preview.blockers.length > 5}}">…</view>
+  </view>
+  <view class="notice" wx:elif="{{previewModal.preview.canPublish === false}}">
+    没有实际变更，不会产生新版本。
+  </view>
+  <view class="notice" wx:else>
+    发布后员工端只能看到新版本的完整数据；未纳入本次修改的班次沿用旧版本。
+  </view>
+  <button class="btn" bindtap="confirmPublish" disabled="{{busy || !previewModal.preview.canPublish}}" loading="{{busy}}">
+    确认发布
+  </button>
+  <button class="btn btn-ghost" style="margin-top: 12rpx;" bindtap="closePreview">取消</button>
+</view>

@@ -1,0 +1,97 @@
+<view class="page">
+  <view class="card">
+    <view class="row-between">
+      <view class="title">班次字典</view>
+      <button class="btn btn-secondary btn-sm" bindtap="openCreate">新增班次</button>
+    </view>
+    <view class="muted">简称在团队内不得有歧义；已发布排班保存时间快照，改字典不影响历史版本。</view>
+  </view>
+
+  <view class="card" wx:if="{{loading}}">
+    <view class="empty">加载中…</view>
+  </view>
+
+  <view class="card" wx:elif="{{items.length === 0}}">
+    <view class="empty">还没有班次，请先维护字典后再导入排班图</view>
+  </view>
+
+  <view class="card" wx:else>
+    <view class="list-item" wx:for="{{items}}" wx:key="_id" data-id="{{item._id}}" bindtap="openEdit">
+      <view class="row-between">
+        <view>
+          <view class="title">{{item.label}} <text class="muted">{{item.code}}</text></view>
+          <view class="muted">
+            简称：{{item.aliases.length ? item.aliases.join('、') : '无'}}
+          </view>
+          <view class="muted" wx:if="{{item.category !== 'OFF'}}">
+            {{item.startLocal}} → {{item.endLocal}}{{item.endDayOffset === 1 ? '（次日）' : ''}} · {{item.reminderEnabled ? '允许提醒' : '不提醒'}}
+          </view>
+          <view class="muted" wx:else>休息 · 不提醒</view>
+        </view>
+        <view class="tags">
+          <view class="tag tag-muted" wx:if="{{!item.enabled}}">已停用</view>
+          <view class="tag" wx:else>{{item.category === 'WORK' ? '工作' : (item.category === 'STUDY' ? '学习' : '休息')}}</view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+
+<view class="mask" wx:if="{{form.visible}}" bindtap="closeForm"></view>
+<view class="sheet" wx:if="{{form.visible}}">
+  <view class="title" style="margin-bottom: 20rpx;">{{form.shiftTypeId ? '编辑班次' : '新增班次'}}</view>
+
+  <view class="form-item">
+    <text class="form-label">班次编码</text>
+    <input class="input" value="{{form.code}}" data-field="code" bindinput="onField" placeholder="如 NIGHT" disabled="{{form.shiftTypeId ? true : false}}" />
+  </view>
+  <view class="form-item">
+    <text class="form-label">显示名称</text>
+    <input class="input" value="{{form.label}}" data-field="label" bindinput="onField" placeholder="如 夜班" />
+  </view>
+  <view class="form-item">
+    <text class="form-label">可识别简称（用顿号或逗号分隔）</text>
+    <input class="input" value="{{form.aliasesText}}" data-field="aliasesText" bindinput="onField" placeholder="如 夜、夜班" />
+  </view>
+  <view class="form-item">
+    <text class="form-label">类别</text>
+    <picker range="{{categories}}" value="{{form.categoryIndex}}" bindchange="onCategory">
+      <view class="input picker-value">{{categories[form.categoryIndex]}}</view>
+    </picker>
+  </view>
+
+  <block wx:if="{{form.categoryIndex !== 1}}">
+    <view class="form-item">
+      <text class="form-label">开始时间</text>
+      <picker mode="time" value="{{form.startLocal}}" bindchange="onStartTime">
+        <view class="input picker-value">{{form.startLocal || '选择时间'}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">结束时间</text>
+      <picker mode="time" value="{{form.endLocal}}" bindchange="onEndTime">
+        <view class="input picker-value">{{form.endLocal || '选择时间'}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">结束日偏移</text>
+      <picker range="{{dayOffsets}}" value="{{form.endDayOffsetIndex}}" bindchange="onDayOffset">
+        <view class="input picker-value">{{form.endDayOffsetIndex === 1 ? '次日' : '当天'}}</view>
+      </picker>
+    </view>
+  </block>
+
+  <view class="switch-row">
+    <view>允许添加到日历提醒</view>
+    <switch checked="{{form.reminderEnabled}}" bindchange="onReminder" color="#1f6feb" />
+  </view>
+  <view class="switch-row">
+    <view>启用该班次</view>
+    <switch checked="{{form.enabled}}" bindchange="onEnabled" color="#1f6feb" />
+  </view>
+
+  <button class="btn" style="margin-top: 24rpx;" bindtap="onSubmit" loading="{{busy}}" disabled="{{busy}}">
+    保存
+  </button>
+  <button class="btn btn-ghost" style="margin-top: 12rpx;" bindtap="closeForm">取消</button>
+</view>

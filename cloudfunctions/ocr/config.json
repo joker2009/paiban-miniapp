@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "openapi": []
+  },
+  "triggers": [
+    {
+      "name": "ocrPoller",
+      "type": "timer",
+      "config": "*/20 * * * * * *"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+.actions {
+  display: flex;
+  gap: 24rpx;
+  flex-shrink: 0;
+}
+
+.mini {
+  font-size: 26rpx;
+  color: var(--brand);
+}
+
+.mini.danger {
+  color: var(--danger);
+}
+
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 101;
+  background: #fff;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 32rpx 24rpx calc(48rpx + env(safe-area-inset-bottom));
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.code-box {
+  margin: 28rpx 0;
+  padding: 28rpx;
+  border-radius: 16rpx;
+  background: #f7f8fa;
+  text-align: center;
+  font-size: 44rpx;
+  font-weight: 600;
+  letter-spacing: 4rpx;
+  font-family: ui-monospace, Menlo, monospace;
+}

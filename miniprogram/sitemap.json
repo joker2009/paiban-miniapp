@@ -1,0 +1,9 @@
+{
+  "desc": "排班助手不开放搜索收录",
+  "rules": [
+    {
+      "action": "disallow",
+      "page": "*"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+.file-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-name {
+  font-size: 28rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-actions {
+  display: flex;
+  gap: 20rpx;
+  flex-shrink: 0;
+}
+
+.mini {
+  font-size: 24rpx;
+  color: var(--brand);
+}
+
+.mini.danger {
+  color: var(--danger);
+}
