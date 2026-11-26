@@ -13,35 +13,71 @@
 | --- | --- |
 | `project.config.json` | `appid` |
 | `miniprogram/config/index.ts` | `CLOUD_ENV_ID` |
+| `miniprogram/config/index.ts` | `USE_SHARED_CLOUD` / `RESOURCE_APPID`（共享环境模式） |
 | `miniprogram/config/index.ts` | `MAX_IMAGES_PER_JOB` / `MAX_IMAGE_BYTES`（与云函数环境变量保持一致） |
+
+### 环境共享模式（当前项目默认）
+
+当前代码默认 `USE_SHARED_CLOUD = true`，通过 `wx.cloud.Cloud({ resourceAppid, resourceEnv })` 访问另一个小程序的环境。需要同时满足：
+
+1. 调用方与资源方**同一主体**（同一营业执照或身份证）。
+2. 资源方在云开发控制台 → 环境共享，添加调用方 AppID，并授权云函数、数据库、存储。
+3. 资源方环境部署 `cloudbase_auth` 云函数（本仓库 `cloudfunctions/cloudbase_auth`），并配置环境变量：
+   `SHARED_APPIDS=wx318613dae09114d3`
+4. `paiban_api`、`paiban_ocr` 也部署在资源方环境；被共享方只能调用，不能部署。
+5. `miniprogram/config/index.ts` 填资源方 AppID：
+   ```ts
+   export const USE_SHARED_CLOUD = true;
+   export const CLOUD_ENV_ID = 'cloud1-d3g9916cz3b402499';
+   export const RESOURCE_APPID = 'wxf641bd4dfe019562';
+   ```
+6. 若资源方环境已有同名 `paiban_api` / `paiban_ocr` / 集合，先改名再部署；客户端函数名改 `API_FUNCTION_NAME`，服务端 OCR 函数名改环境变量 `OCR_FUNCTION_NAME`。
+7. 资源共享的配额和费用计入资源方环境。
+
+**共享环境自检（按报错定位）**
+
+| 现象 | 大概率原因 |
+| --- | --- |
+| `env not exists` / `CLOUD_INIT` | 环境 ID 或资源方 AppID 填错；环境共享未生效；调用方 AppID 未加入共享 |
+| `NO_FROM_APPID` | `cloudbase_auth` 被调用但拿不到来源 AppID，确认是从小程序端经共享实例调用 |
+| `SHARED_APPIDS_NOT_CONFIGURED` | `cloudbase_auth` 没配 `SHARED_APPIDS` 环境变量 |
+| `APP_NOT_ALLOWED` | 调用方 AppID 不在 `SHARED_APPIDS` 列表里 |
+| `FUNCTION_NOT_FOUND` / 函数不存在 | `paiban_api` 没部署到资源方环境，或客户端 `API_FUNCTION_NAME` 与函数名不一致 |
+| `UNAUTHORIZED` | 云函数里取不到 `OPENID`/`FROM_OPENID`，检查是否用了共享实例调用 |
+| 上传 403 | 资源方存储权限未放行共享方；可先在控制台放开，或改用服务端中转上传 |
+
+验证顺序：共享实例 `init()` → `auth.getMe` 返回 `openid` → `paiban_bootstrap` 初始化 → 导入一张脱敏样图。
 
 ## 3. 安装依赖与部署云函数
 
 ```bash
-cd cloudfunctions/api && npm install
-cd ../ocr && npm install
-cd ../bootstrap && npm install
+cd cloudfunctions/paiban_api && npm install
+cd ../paiban_ocr && npm install
+cd ../paiban_bootstrap && npm install
+cd ../cloudbase_auth && npm install
 ```
 
-在开发者工具里分别右键 `api`、`ocr`、`bootstrap` 目录 → **上传并部署：云端安装依赖**。
+在开发者工具里分别右键 `paiban_api`、`paiban_ocr`、`paiban_bootstrap` 目录 → **上传并部署：云端安装依赖**。
 
-`ocr` 还需要上传触发器：右键 `ocr` → **上传触发器**（`config.json` 中每分钟轮询 `PENDING_OCR`）。
+使用环境共享时，以上函数必须部署在**资源方**环境；`cloudbase_auth` 也必须部署在资源方环境，函数名固定。
 
-三个函数的运行内存建议 256MB；`ocr` 超时时间建议在云控制台调到 60 秒（识别密集表格时可再加大）。
+`paiban_ocr` 还需要上传触发器：右键 `paiban_ocr` → **上传触发器**（`config.json` 中每分钟轮询 `PENDING_OCR`）。
+
+三个函数的运行内存建议 256MB；`paiban_ocr` 超时时间建议在云控制台调到 60 秒（识别密集表格时可再加大）。
 
 ## 4. 环境变量
 
 在云开发控制台 → 云函数 → 对应函数 → 配置 → 环境变量。
 
-**api**
+**paiban_api**
 
 | 变量 | 必填 | 说明 |
 | --- | --- | --- |
 | `INVITE_PEPPER` | 是 | 邀请码摘要盐值，随机长串，与 bootstrap 保持一致 |
-| `INTERNAL_TOKEN` | 是 | api 唤醒 ocr 的内部令牌，与 ocr 保持一致 |
+| `INTERNAL_TOKEN` | 是 | paiban_api 唤醒 paiban_ocr 的内部令牌，两者保持一致 |
 | `MAX_IMAGE_BYTES` | 否 | 单图上限，默认 10485760（10MB） |
 
-**ocr**
+**paiban_ocr**
 
 | 变量 | 必填 | 说明 |
 | --- | --- | --- |
@@ -49,14 +85,14 @@ cd ../bootstrap && npm install
 | `DEEPSEEK_MODEL` | 是 | 支持图片输入的模型名 |
 | `DEEPSEEK_BASE_URL` | 否 | 默认 `https://api.deepseek.com` |
 | `DEEPSEEK_MAX_TOKENS` | 否 | 默认 8000；大团队周表可调大 |
-| `INTERNAL_TOKEN` | 是 | 与 api 一致 |
+| `INTERNAL_TOKEN` | 是 | 与 paiban_api 一致 |
 
-**bootstrap**（初始化完成后删除）
+**paiban_bootstrap**（初始化完成后删除）
 
 | 变量 | 必填 | 说明 |
 | --- | --- | --- |
 | `BOOTSTRAP_TOKEN` | 是 | 随机长串，调用时传入 |
-| `INVITE_PEPPER` | 是 | 与 api 一致 |
+| `INVITE_PEPPER` | 是 | 与 paiban_api 一致 |
 
 ## 5. 数据库集合与权限
 
@@ -70,29 +106,29 @@ cd ../bootstrap && npm install
 
 需要设置的集合：
 
-`teams`、`employees`、`bindings`、`admins`、`invites`、`shiftTypes`、`importJobs`、`draftCells`、`releaseVersions`、`publishedShifts`、`weekPointers`、`auditLogs`、`idempotency`
+`pb_teams`、`pb_employees`、`pb_bindings`、`pb_admins`、`pb_invites`、`pb_shiftTypes`、`pb_importJobs`、`pb_draftCells`、`pb_releaseVersions`、`pb_publishedShifts`、`pb_weekPointers`、`pb_auditLogs`、`pb_idempotency`
 
 ## 6. 索引（控制台 → 数据库 → 索引管理）
 
 | 集合 | 索引字段 | 唯一 |
 | --- | --- | --- |
-| `employees` | `teamId, employeeNo` | 是 |
-| `employees` | `teamId, createdAt` | 否 |
-| `admins` | `openid, teamId` | 是 |
-| `bindings` | `openid, status` | 否（唯一性由云函数保证，便于未来解绑留痕） |
-| `bindings` | `employeeId, status` | 否 |
-| `invites` | `tokenHash` | 是 |
-| `invites` | `teamId, expiresAt` | 否 |
-| `shiftTypes` | `teamId, code` | 是 |
-| `importJobs` | `teamId, weekStart, createdAt` | 否 |
-| `importJobs` | `status, updatedAt` | 否 |
-| `draftCells` | `jobId, status` | 否 |
-| `draftCells` | `jobId, rowKey, workDate` | 否 |
-| `publishedShifts` | `releaseId, employeeId` | 否 |
-| `publishedShifts` | `employeeId, workDate` | 否 |
-| `releaseVersions` | `teamId, weekStart, version` | 否 |
-| `weekPointers` | 无需（按 `_id` 读取） | — |
-| `auditLogs` | `teamId, createdAt` | 否 |
+| `pb_employees` | `teamId, employeeNo` | 是 |
+| `pb_employees` | `teamId, createdAt` | 否 |
+| `pb_admins` | `openid, teamId` | 是 |
+| `pb_bindings` | `openid, status` | 否（唯一性由云函数保证，便于未来解绑留痕） |
+| `pb_bindings` | `employeeId, status` | 否 |
+| `pb_invites` | `tokenHash` | 是 |
+| `pb_invites` | `teamId, expiresAt` | 否 |
+| `pb_shiftTypes` | `teamId, code` | 是 |
+| `pb_importJobs` | `teamId, weekStart, createdAt` | 否 |
+| `pb_importJobs` | `status, updatedAt` | 否 |
+| `pb_draftCells` | `jobId, status` | 否 |
+| `pb_draftCells` | `jobId, rowKey, workDate` | 否 |
+| `pb_publishedShifts` | `releaseId, employeeId` | 否 |
+| `pb_publishedShifts` | `employeeId, workDate` | 否 |
+| `pb_releaseVersions` | `teamId, weekStart, version` | 否 |
+| `pb_weekPointers` | 无需（按 `_id` 读取） | — |
+| `pb_auditLogs` | `teamId, createdAt` | 否 |
 
 ## 7. 初始化数据
 
@@ -100,28 +136,28 @@ cd ../bootstrap && npm install
 
 ```js
 // 开发者工具 Console
-wx.cloud.callFunction({ name: 'api', data: { op: 'auth.getMe' } }).then(console.log)
+wx.cloud.callFunction({ name: 'paiban_api', data: { op: 'auth.getMe' } }).then(console.log)
 ```
 
 2. 调用 `bootstrap`（开发者工具 Console 或云控制台「云函数测试」）：
 
 ```js
 wx.cloud.callFunction({
-  name: 'bootstrap',
+  name: 'paiban_bootstrap',
   data: { token: '<BOOTSTRAP_TOKEN>', action: 'initTeam', name: '示例团队', adminOpenid: '<你的openid>' }
 }).then(console.log) // 记住返回的 teamId
 ```
 
 ```js
 wx.cloud.callFunction({
-  name: 'bootstrap',
+  name: 'paiban_bootstrap',
   data: { token: '<BOOTSTRAP_TOKEN>', action: 'seedShiftTypes', teamId: '<teamId>' }
 }).then(console.log)
 ```
 
 ```js
 wx.cloud.callFunction({
-  name: 'bootstrap',
+  name: 'paiban_bootstrap',
   data: {
     token: '<BOOTSTRAP_TOKEN>', action: 'seedEmployees', teamId: '<teamId>',
     employees: [{ employeeNo: '0001', name: '张三' }, { employeeNo: '0002', name: '李四' }]
@@ -133,7 +169,7 @@ wx.cloud.callFunction({
 
 ```js
 wx.cloud.callFunction({
-  name: 'bootstrap',
+  name: 'paiban_bootstrap',
   data: { token: '<BOOTSTRAP_TOKEN>', action: 'makeInviteCode', employeeId: '<employeeId>' }
 }).then(console.log)
 ```

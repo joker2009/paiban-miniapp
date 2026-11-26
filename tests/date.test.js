@@ -1,6 +1,6 @@
 const assert = require('node:assert');
-const d = require('../cloudfunctions/api/lib/date');
-const { extractJson } = require('../cloudfunctions/ocr/lib/parse');
+const d = require('../cloudfunctions/paiban_api/lib/date');
+const { extractJson } = require('../cloudfunctions/paiban_ocr/lib/parse');
 
 function test(name, fn) {
   try {

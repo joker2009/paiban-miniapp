@@ -8,10 +8,10 @@ const _ = db.command;
 const $ = db.command.aggregate;
 
 const C = {
-  jobs: 'importJobs',
-  cells: 'draftCells',
-  employees: 'employees',
-  shiftTypes: 'shiftTypes',
+  jobs: 'pb_importJobs',
+  cells: 'pb_draftCells',
+  employees: 'pb_employees',
+  shiftTypes: 'pb_shiftTypes',
 };
 
 const WEEK_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];

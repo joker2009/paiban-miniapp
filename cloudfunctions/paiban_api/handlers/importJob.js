@@ -9,6 +9,7 @@ const { audit } = require('../lib/audit');
 const MAX_IMAGES = 5;
 const MAX_IMAGE_BYTES = Number(process.env.MAX_IMAGE_BYTES || 10 * 1024 * 1024);
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN || '';
+const OCR_FUNCTION_NAME = process.env.OCR_FUNCTION_NAME || 'paiban_ocr';
 
 function detectImage(buf) {
   if (buf.length < 12) return null;
@@ -160,7 +161,7 @@ async function submitJob(payload) {
 
   // 触发异步识别：定时触发器会兜底，这里只做尽力而为的即时唤醒
   if (INTERNAL_TOKEN) {
-    cloud.callFunction({ name: 'ocr', data: { jobId, token: INTERNAL_TOKEN } }).catch((e) => {
+    cloud.callFunction({ name: OCR_FUNCTION_NAME, data: { jobId, token: INTERNAL_TOKEN } }).catch((e) => {
       console.warn('[import] wake ocr failed', e && e.message);
     });
   }
@@ -218,7 +219,7 @@ async function retryFailed(payload) {
   });
 
   if (INTERNAL_TOKEN) {
-    cloud.callFunction({ name: 'ocr', data: { jobId, token: INTERNAL_TOKEN } }).catch(() => {});
+    cloud.callFunction({ name: OCR_FUNCTION_NAME, data: { jobId, token: INTERNAL_TOKEN } }).catch(() => {});
   }
   return {};
 }

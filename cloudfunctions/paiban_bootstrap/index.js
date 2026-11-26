@@ -71,12 +71,12 @@ exports.main = async (event) => {
     const adminOpenid = String(event.adminOpenid || '').trim();
     if (!name || !adminOpenid) return { ok: false, message: 'name 与 adminOpenid 必填' };
 
-    const exists = await db.collection('teams').where({ name }).limit(1).get();
+    const exists = await db.collection('pb_teams').where({ name }).limit(1).get();
     let teamId;
     if (exists.data.length > 0) {
       teamId = exists.data[0]._id;
     } else {
-      const added = await db.collection('teams').add({
+      const added = await db.collection('pb_teams').add({
         data: {
           orgId: event.orgId || 'default',
           name,
@@ -87,9 +87,9 @@ exports.main = async (event) => {
       teamId = added._id;
     }
 
-    const adminExists = await db.collection('admins').where({ openid: adminOpenid, teamId }).limit(1).get();
+    const adminExists = await db.collection('pb_admins').where({ openid: adminOpenid, teamId }).limit(1).get();
     if (adminExists.data.length === 0) {
-      await db.collection('admins').add({
+      await db.collection('pb_admins').add({
         data: {
           openid: adminOpenid,
           appId: event.appId || '',
@@ -108,9 +108,9 @@ exports.main = async (event) => {
     if (!teamId) return { ok: false, message: 'teamId 必填' };
     const created = [];
     for (const s of SAMPLE_SHIFTS) {
-      const dup = await db.collection('shiftTypes').where({ teamId, code: s.code }).limit(1).get();
+      const dup = await db.collection('pb_shiftTypes').where({ teamId, code: s.code }).limit(1).get();
       if (dup.data.length > 0) continue;
-      await db.collection('shiftTypes').add({
+      await db.collection('pb_shiftTypes').add({
         data: { ...s, teamId, enabled: true, revision: 1, createdAt: now, updatedAt: now },
       });
       created.push(s.code);
@@ -123,15 +123,15 @@ exports.main = async (event) => {
     const employees = Array.isArray(event.employees) ? event.employees : [];
     if (!teamId || employees.length === 0) return { ok: false, message: 'teamId 与 employees 必填' };
 
-    const teamDoc = await db.collection('teams').doc(teamId).get();
+    const teamDoc = await db.collection('pb_teams').doc(teamId).get();
     const created = [];
     for (const e of employees) {
       const employeeNo = String(e.employeeNo || '').trim();
       const name = String(e.name || '').trim();
       if (!employeeNo || !name) continue;
-      const dup = await db.collection('employees').where({ teamId, employeeNo }).limit(1).get();
+      const dup = await db.collection('pb_employees').where({ teamId, employeeNo }).limit(1).get();
       if (dup.data.length > 0) continue;
-      await db.collection('employees').add({
+      await db.collection('pb_employees').add({
         data: {
           orgId: teamDoc.data.orgId,
           teamId,
@@ -151,11 +151,11 @@ exports.main = async (event) => {
     // 仅开发便利：直接生成一个邀请码（正式流程走 admin.issueInvite）
     const employeeId = String(event.employeeId || '').trim();
     if (!employeeId) return { ok: false, message: 'employeeId 必填' };
-    const emp = await db.collection('employees').doc(employeeId).get();
+    const emp = await db.collection('pb_employees').doc(employeeId).get();
     const pepper = process.env.INVITE_PEPPER || 'paiban-invite-pepper-change-me';
     const code = crypto.randomBytes(9).toString('base64url').replace(/[-_]/g, '').toUpperCase().slice(0, 12);
     const tokenHash = crypto.createHash('sha256').update(`${pepper}:${code}`).digest('hex');
-    await db.collection('invites').add({
+    await db.collection('pb_invites').add({
       data: {
         tokenHash,
         employeeId,

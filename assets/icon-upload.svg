@@ -1,0 +1,44 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="80" x2="920" y2="960" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3B86FF"/>
+      <stop offset="0.55" stop-color="#1F6FEB"/>
+      <stop offset="1" stop-color="#0B4BC4"/>
+    </linearGradient>
+    <linearGradient id="shift" x1="444" y1="582" x2="556" y2="694" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFC24D"/>
+      <stop offset="1" stop-color="#FF8A00"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 底：圆角方块 + 光晕 -->
+  <rect width="1024" height="1024" rx="0" fill="url(#bg)"/>
+  <circle cx="842" cy="150" r="270" fill="#FFFFFF" opacity="0.06"/>
+  <circle cx="150" cy="884" r="310" fill="#FFFFFF" opacity="0.05"/>
+
+  <!-- 日历卡 -->
+  <rect x="212" y="232" width="600" height="640" rx="72" fill="#FFFFFF"/>
+  <path d="M212 304C212 264.235 244.235 232 284 232H740C779.765 232 812 264.235 812 304V388H212V304Z" fill="#E8F0FF"/>
+
+  <!-- 装订环 -->
+  <rect x="330" y="188" width="46" height="120" rx="23" fill="#FFFFFF"/>
+  <rect x="648" y="188" width="46" height="120" rx="23" fill="#FFFFFF"/>
+
+  <!-- 班次格 3x3 -->
+  <rect x="302" y="440" width="112" height="112" rx="28" fill="#EAF1FF"/>
+  <rect x="444" y="440" width="112" height="112" rx="28" fill="#EAF1FF"/>
+  <rect x="586" y="440" width="112" height="112" rx="28" fill="#EAF1FF"/>
+
+  <rect x="302" y="582" width="112" height="112" rx="28" fill="#EAF1FF"/>
+  <!-- 高亮：这一格是“已确认的班次” -->
+  <rect x="444" y="582" width="112" height="112" rx="28" fill="url(#shift)"/>
+  <rect x="586" y="582" width="112" height="112" rx="28" fill="#EAF1FF"/>
+
+  <rect x="302" y="724" width="112" height="112" rx="28" fill="#EAF1FF"/>
+  <rect x="444" y="724" width="112" height="112" rx="28" fill="#EAF1FF"/>
+  <rect x="586" y="724" width="112" height="112" rx="28" fill="#EAF1FF"/>
+
+  <!-- 高亮格内：时钟 -->
+  <circle cx="500" cy="638" r="34" stroke="#FFFFFF" stroke-width="10"/>
+  <path d="M500 620V640L514 650" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

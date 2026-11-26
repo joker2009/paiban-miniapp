@@ -6,8 +6,9 @@ const { ERR } = require('./errors');
  */
 async function getIdentity() {
   const ctx = cloud.getWXContext();
-  const openid = ctx.OPENID;
-  const appId = ctx.APPID || '';
+  // 环境共享调用时，身份在 FROM_OPENID / FROM_APPID 中
+  const openid = ctx.OPENID || ctx.FROM_OPENID;
+  const appId = ctx.APPID || ctx.FROM_APPID || '';
   if (!openid) throw ERR.UNAUTHORIZED('无法获取微信身份');
 
   const [adminRes, bindingRes] = await Promise.all([

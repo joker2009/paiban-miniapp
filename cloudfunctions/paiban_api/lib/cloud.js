@@ -6,19 +6,19 @@ const db = cloud.database();
 const _ = db.command;
 
 const COLLECTIONS = {
-  teams: 'teams',
-  employees: 'employees',
-  bindings: 'bindings',
-  admins: 'admins',
-  invites: 'invites',
-  shiftTypes: 'shiftTypes',
-  importJobs: 'importJobs',
-  draftCells: 'draftCells',
-  releaseVersions: 'releaseVersions',
-  publishedShifts: 'publishedShifts',
-  weekPointers: 'weekPointers',
-  auditLogs: 'auditLogs',
-  idempotency: 'idempotency',
+  teams: 'pb_teams',
+  employees: 'pb_employees',
+  bindings: 'pb_bindings',
+  admins: 'pb_admins',
+  invites: 'pb_invites',
+  shiftTypes: 'pb_shiftTypes',
+  importJobs: 'pb_importJobs',
+  draftCells: 'pb_draftCells',
+  releaseVersions: 'pb_releaseVersions',
+  publishedShifts: 'pb_publishedShifts',
+  weekPointers: 'pb_weekPointers',
+  auditLogs: 'pb_auditLogs',
+  idempotency: 'pb_idempotency',
 };
 
 /** 服务端分页读取全部（单页上限 1000） */

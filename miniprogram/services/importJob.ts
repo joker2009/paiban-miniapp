@@ -1,4 +1,4 @@
-import { call } from '../utils/cloud';
+import { call, uploadFile as cloudUpload } from '../utils/cloud';
 import type { ImportJob } from '../types/index';
 
 export interface CreateJobInput {
@@ -19,8 +19,7 @@ export async function uploadImage(
   ext: string
 ): Promise<string> {
   const cloudPath = `${uploadPrefix}/${index}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const res = await wx.cloud.uploadFile({ cloudPath, filePath: tempFilePath });
-  return res.fileID;
+  return cloudUpload(cloudPath, tempFilePath);
 }
 
 export function submitJob(
