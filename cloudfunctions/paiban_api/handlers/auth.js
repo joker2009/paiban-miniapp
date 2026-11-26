@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { cloud, db, COLLECTIONS } = require('../lib/cloud');
+const { cloud, db, _, COLLECTIONS, safeGet } = require('../lib/cloud');
 const { getIdentity } = require('../lib/auth');
 const { ERR } = require('../lib/errors');
 const { str } = require('../lib/validate');
@@ -31,7 +31,7 @@ async function bindInvite(payload) {
   const identity = await getIdentity();
   const tokenHash = hashInvite(code);
 
-  const res = await db.collection(COLLECTIONS.invites).where({ tokenHash }).limit(1).get();
+  const res = await safeGet(db.collection(COLLECTIONS.invites).where({ tokenHash }).limit(1));
   const invite = res.data[0];
   if (!invite) throw ERR.INVITE_INVALID();
 
@@ -43,11 +43,12 @@ async function bindInvite(payload) {
   const empDoc = await db.collection(COLLECTIONS.employees).doc(invite.employeeId).get().catch(() => null);
   if (!empDoc || !empDoc.data || empDoc.data.status !== 'ACTIVE') throw ERR.INVITE_INVALID();
 
-  const existing = await db
-    .collection(COLLECTIONS.bindings)
-    .where({ openid: identity.openid, status: 'ACTIVE' })
-    .limit(1)
-    .get();
+  const existing = await safeGet(
+    db
+      .collection(COLLECTIONS.bindings)
+      .where({ openid: identity.openid, status: 'ACTIVE' })
+      .limit(1)
+  );
 
   if (existing.data.length > 0) {
     if (existing.data[0].employeeId === invite.employeeId) {
@@ -92,4 +93,90 @@ async function bindInvite(payload) {
   return { employeeId: invite.employeeId, teamId: empDoc.data.teamId };
 }
 
-module.exports = { getMe, bindInvite };
+/**
+ * 管理员可绑定的员工列表（仅限其管理团队）。
+ * 管理员身份本身不等于员工绑定，需要显式选择一条员工记录。
+ */
+async function listBindableEmployees() {
+  const identity = await getIdentity();
+  if (identity.adminTeams.length === 0) throw ERR.FORBIDDEN('无管理权限');
+
+  const items = [];
+  for (const team of identity.adminTeams) {
+    const empRes = await safeGet(
+      db
+        .collection(COLLECTIONS.employees)
+        .where({ teamId: team.teamId, status: 'ACTIVE' })
+        .limit(200)
+    );
+    const ids = empRes.data.map((e) => e._id);
+    let bindingMap = new Map();
+    if (ids.length > 0) {
+      const bindings = await safeGet(
+        db
+          .collection(COLLECTIONS.bindings)
+          .where({ employeeId: _.in(ids), status: 'ACTIVE' })
+          .limit(1000)
+      );
+      bindingMap = new Map(bindings.data.map((b) => [b.employeeId, b]));
+    }
+    for (const e of empRes.data) {
+      const b = bindingMap.get(e._id);
+      items.push({
+        employeeId: e._id,
+        employeeNo: e.employeeNo,
+        name: e.name,
+        teamId: team.teamId,
+        teamName: team.teamName,
+        bound: !!b,
+        boundToMe: !!b && b.openid === identity.openid,
+      });
+    }
+  }
+  return { items };
+}
+
+/** 管理员把自己绑定到管理团队内的一条员工记录（无需邀请码） */
+async function bindSelf(payload) {
+  const employeeId = str(payload.employeeId, 'employeeId', { min: 1, max: 64 });
+  const identity = await getIdentity();
+  if (identity.adminTeams.length === 0) throw ERR.FORBIDDEN('无管理权限');
+
+  const empDoc = await db.collection(COLLECTIONS.employees).doc(employeeId).get().catch(() => null);
+  if (!empDoc || !empDoc.data) throw ERR.NOT_FOUND('员工不存在');
+  const emp = empDoc.data;
+
+  if (!identity.adminTeams.some((t) => t.teamId === emp.teamId)) {
+    throw ERR.FORBIDDEN('该员工不属于你管理的团队');
+  }
+  if (emp.status !== 'ACTIVE') throw ERR.CONFLICT('员工已停用');
+
+  if (identity.binding) {
+    if (identity.binding.employeeId === employeeId) {
+      return { employeeId, teamId: emp.teamId, already: true };
+    }
+    throw ERR.FORBIDDEN('当前微信已绑定其他员工，请联系部署方解绑');
+  }
+
+  const existing = await safeGet(
+    db.collection(COLLECTIONS.bindings).where({ employeeId, status: 'ACTIVE' }).limit(1)
+  );
+  if (existing.data.length > 0) throw ERR.CONFLICT('该员工已被其他微信绑定');
+
+  await db.collection(COLLECTIONS.bindings).add({
+    data: {
+      appId: identity.appId,
+      openid: identity.openid,
+      employeeId,
+      orgId: emp.orgId,
+      teamId: emp.teamId,
+      status: 'ACTIVE',
+      boundBy: 'admin-self',
+      boundAt: new Date(),
+      createdAt: new Date(),
+    },
+  });
+  return { employeeId, teamId: emp.teamId };
+}
+
+module.exports = { getMe, bindInvite, listBindableEmployees, bindSelf };

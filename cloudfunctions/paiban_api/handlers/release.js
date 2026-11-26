@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { db, _, COLLECTIONS, getAll } = require('../lib/cloud');
+const { db, _, COLLECTIONS, getAll, safeGet, safeCount } = require('../lib/cloud');
 const { getIdentity, requireAdmin } = require('../lib/auth');
 const { ERR } = require('../lib/errors');
 const { str, int, optStr } = require('../lib/validate');
@@ -136,7 +136,7 @@ function addDaysStr(dateStr, days) {
 }
 
 async function loadShiftMap(teamId) {
-  const res = await db.collection(COLLECTIONS.shiftTypes).where({ teamId }).limit(200).get();
+  const res = await safeGet(db.collection(COLLECTIONS.shiftTypes).where({ teamId }).limit(200));
   const map = {};
   for (const s of res.data) map[s.code] = s;
   return map;
@@ -276,10 +276,9 @@ async function publish(payload) {
 
   // 2) 先写完整快照，校验数量
   await writePublishedShifts(releaseId, rows);
-  const written = await db
-    .collection(COLLECTIONS.publishedShifts)
-    .where({ releaseId })
-    .count();
+  const written = await safeCount(
+    db.collection(COLLECTIONS.publishedShifts).where({ releaseId })
+  );
   if (written.total !== rows.length) {
     console.error('[release] snapshot incomplete', releaseId, written.total, rows.length);
     throw ERR.INTERNAL('发布快照不完整，请重试');
@@ -379,12 +378,13 @@ async function listHistory(payload) {
   const identity = await getIdentity();
   requireAdmin(identity, teamId);
 
-  const res = await db
-    .collection(COLLECTIONS.releaseVersions)
-    .where({ teamId, weekStart })
-    .orderBy('version', 'desc')
-    .limit(20)
-    .get();
+  const res = await safeGet(
+    db
+      .collection(COLLECTIONS.releaseVersions)
+      .where({ teamId, weekStart })
+      .orderBy('version', 'desc')
+      .limit(20)
+  );
 
   return {
     items: res.data.map((r) => ({

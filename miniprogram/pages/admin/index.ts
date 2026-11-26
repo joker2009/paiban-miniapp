@@ -127,8 +127,15 @@ Page({
   },
 
   goImport() {
+    if (!this.data.teamId) {
+      wx.showToast({ title: '团队信息加载中，请稍后重试', icon: 'none' });
+      return;
+    }
     wx.navigateTo({
-      url: `/pages/admin/import/index?teamId=${this.data.teamId}&weekStart=${this.data.weekStart}`,
+      url:
+        `/pages/admin/import/index?teamId=${this.data.teamId}` +
+        `&weekStart=${this.data.weekStart}` +
+        `&teamName=${encodeURIComponent(this.data.teamName)}`,
     });
   },
 

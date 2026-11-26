@@ -5,6 +5,8 @@ const { AppError } = require('./lib/errors');
 const handlers = {
   'auth.getMe': require('./handlers/auth').getMe,
   'auth.bindInvite': require('./handlers/auth').bindInvite,
+  'auth.listBindableEmployees': require('./handlers/auth').listBindableEmployees,
+  'auth.bindSelf': require('./handlers/auth').bindSelf,
 
   'admin.listEmployees': require('./handlers/admin').listEmployees,
   'admin.saveEmployee': require('./handlers/admin').saveEmployee,

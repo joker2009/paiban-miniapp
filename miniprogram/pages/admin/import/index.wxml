@@ -1,12 +1,29 @@
 <view class="page">
   <view class="card">
-    <view class="title">{{weekStart}} 所在周</view>
+    <view class="row-between">
+      <view>
+        <view class="title">{{weekStart}} 所在周</view>
+        <view class="muted" wx:if="{{teamName}}">团队：{{teamName}}</view>
+        <view class="muted" wx:if="{{resolving}}">正在获取团队信息…</view>
+      </view>
+      <picker
+        wx:if="{{teams.length > 1}}"
+        range="{{teams}}"
+        range-key="teamName"
+        bindchange="onTeamChange"
+      >
+        <view class="tag">切换团队</view>
+      </picker>
+    </view>
+    <view class="notice notice-danger" wx:if="{{noAccess}}">
+      当前账号没有排班管理员权限，请先联系部署方授权后再导入。
+    </view>
     <view class="subtitle">同一批次只支持一个团队、一个自然周；混入不同周的图请拆成两个任务。</view>
 
-    <button class="btn" style="margin-top: 24rpx;" bindtap="chooseFromChat" disabled="{{uploading}}">
+    <button class="btn" style="margin-top: 24rpx;" bindtap="chooseFromChat" disabled="{{uploading || noAccess}}">
       从微信聊天选图
     </button>
-    <button class="btn btn-ghost" style="margin-top: 16rpx;" bindtap="chooseFromAlbum" disabled="{{uploading}}">
+    <button class="btn btn-ghost" style="margin-top: 16rpx;" bindtap="chooseFromAlbum" disabled="{{uploading || noAccess}}">
       从相册选图
     </button>
     <view class="muted" style="margin-top: 16rpx; text-align: center;">

@@ -1,4 +1,4 @@
-const { cloud, db, COLLECTIONS } = require('./cloud');
+const { cloud, db, COLLECTIONS, safeGet } = require('./cloud');
 const { ERR } = require('./errors');
 
 /**
@@ -12,8 +12,8 @@ async function getIdentity() {
   if (!openid) throw ERR.UNAUTHORIZED('无法获取微信身份');
 
   const [adminRes, bindingRes] = await Promise.all([
-    db.collection(COLLECTIONS.admins).where({ openid }).get(),
-    db.collection(COLLECTIONS.bindings).where({ openid, status: 'ACTIVE' }).limit(1).get(),
+    safeGet(db.collection(COLLECTIONS.admins).where({ openid })),
+    safeGet(db.collection(COLLECTIONS.bindings).where({ openid, status: 'ACTIVE' }).limit(1)),
   ]);
 
   const adminTeams = [];

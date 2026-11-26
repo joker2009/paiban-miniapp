@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { db, _, COLLECTIONS } = require('../lib/cloud');
+const { db, _, COLLECTIONS, safeGet } = require('../lib/cloud');
 const { getIdentity, requireAdmin } = require('../lib/auth');
 const { ERR } = require('../lib/errors');
 const { str, int, bool, arr } = require('../lib/validate');
@@ -27,12 +27,13 @@ async function listEmployees(payload) {
   const where = { teamId };
   if (cursor) where.createdAt = _.lt(cursor);
 
-  const res = await db
-    .collection(COLLECTIONS.employees)
-    .where(where)
-    .orderBy('createdAt', 'desc')
-    .limit(PAGE_SIZE + 1)
-    .get();
+  const res = await safeGet(
+    db
+      .collection(COLLECTIONS.employees)
+      .where(where)
+      .orderBy('createdAt', 'desc')
+      .limit(PAGE_SIZE + 1)
+  );
 
   const items = res.data.slice(0, PAGE_SIZE);
   const nextCursor = res.data.length > PAGE_SIZE
@@ -42,11 +43,12 @@ async function listEmployees(payload) {
   const ids = items.map((e) => e._id);
   let boundIds = new Set();
   if (ids.length > 0) {
-    const bindings = await db
-      .collection(COLLECTIONS.bindings)
-      .where({ employeeId: _.in(ids), status: 'ACTIVE' })
-      .limit(1000)
-      .get();
+    const bindings = await safeGet(
+      db
+        .collection(COLLECTIONS.bindings)
+        .where({ employeeId: _.in(ids), status: 'ACTIVE' })
+        .limit(1000)
+    );
     boundIds = new Set(bindings.data.map((b) => b.employeeId));
   }
 
@@ -68,11 +70,9 @@ async function saveEmployee(payload) {
   const name = str(payload.name, '姓名', { min: 1, max: 32 });
   const status = payload.status === 'DISABLED' ? 'DISABLED' : 'ACTIVE';
 
-  const dup = await db
-    .collection(COLLECTIONS.employees)
-    .where({ teamId, employeeNo })
-    .limit(2)
-    .get();
+  const dup = await safeGet(
+    db.collection(COLLECTIONS.employees).where({ teamId, employeeNo }).limit(2)
+  );
   const dupOther = dup.data.find((e) => e._id !== payload.employeeId);
   if (dupOther) throw ERR.CONFLICT('该工号已存在');
 
@@ -101,11 +101,12 @@ async function saveEmployee(payload) {
 
   if (status === 'DISABLED') {
     // 停用员工：撤销未使用邀请码
-    const invites = await db
-      .collection(COLLECTIONS.invites)
-      .where({ employeeId, teamId, usedAt: _.exists(false), revokedAt: _.exists(false) })
-      .limit(100)
-      .get();
+    const invites = await safeGet(
+      db
+        .collection(COLLECTIONS.invites)
+        .where({ employeeId, teamId, usedAt: _.exists(false), revokedAt: _.exists(false) })
+        .limit(100)
+    );
     for (const inv of invites.data) {
       await db.collection(COLLECTIONS.invites).doc(inv._id).update({ data: { revokedAt: new Date() } });
     }
@@ -129,16 +130,17 @@ async function issueInvite(payload) {
   if (!empDoc || !empDoc.data || empDoc.data.teamId !== teamId) throw ERR.NOT_FOUND('员工不存在');
   if (empDoc.data.status !== 'ACTIVE') throw ERR.CONFLICT('员工已停用，不能发放邀请码');
 
-  const active = await db
-    .collection(COLLECTIONS.invites)
-    .where({
-      employeeId,
-      usedAt: _.exists(false),
-      revokedAt: _.exists(false),
-      expiresAt: _.gt(new Date()),
-    })
-    .limit(10)
-    .get();
+  const active = await safeGet(
+    db
+      .collection(COLLECTIONS.invites)
+      .where({
+        employeeId,
+        usedAt: _.exists(false),
+        revokedAt: _.exists(false),
+        expiresAt: _.gt(new Date()),
+      })
+      .limit(10)
+  );
   if (active.data.length >= 5) throw ERR.CONFLICT('有效邀请码过多，请先撤销部分邀请码');
 
   const inviteCode = crypto.randomBytes(9).toString('base64url').replace(/[-_]/g, '').toUpperCase().slice(0, 12);
@@ -186,17 +188,18 @@ async function revokeInvite(payload) {
 
 async function listInvites(payload) {
   const { teamId } = await adminIdentity(payload);
-  const res = await db
-    .collection(COLLECTIONS.invites)
-    .where({
-      teamId,
-      usedAt: _.exists(false),
-      revokedAt: _.exists(false),
-      expiresAt: _.gt(new Date()),
-    })
-    .orderBy('expiresAt', 'asc')
-    .limit(100)
-    .get();
+  const res = await safeGet(
+    db
+      .collection(COLLECTIONS.invites)
+      .where({
+        teamId,
+        usedAt: _.exists(false),
+        revokedAt: _.exists(false),
+        expiresAt: _.gt(new Date()),
+      })
+      .orderBy('expiresAt', 'asc')
+      .limit(100)
+  );
   return {
     items: res.data.map((i) => ({
       inviteId: i._id,
@@ -209,12 +212,13 @@ async function listInvites(payload) {
 
 async function listShiftTypes(payload) {
   const { teamId } = await adminIdentity(payload);
-  const res = await db
-    .collection(COLLECTIONS.shiftTypes)
-    .where({ teamId })
-    .orderBy('code', 'asc')
-    .limit(200)
-    .get();
+  const res = await safeGet(
+    db
+      .collection(COLLECTIONS.shiftTypes)
+      .where({ teamId })
+      .orderBy('code', 'asc')
+      .limit(200)
+  );
   return { items: res.data };
 }
 
@@ -266,7 +270,7 @@ async function saveShiftType(payload) {
   }
 
   // 团队内简称 / 名称 / 编码不得歧义
-  const all = await db.collection(COLLECTIONS.shiftTypes).where({ teamId }).limit(200).get();
+  const all = await safeGet(db.collection(COLLECTIONS.shiftTypes).where({ teamId }).limit(200));
   const others = all.data.filter((s) => s._id !== payload.shiftTypeId);
   const taken = new Set();
   for (const s of others) {

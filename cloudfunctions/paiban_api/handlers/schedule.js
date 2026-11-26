@@ -1,4 +1,4 @@
-const { db, COLLECTIONS, getAll } = require('../lib/cloud');
+const { db, COLLECTIONS, getAll, safeGet } = require('../lib/cloud');
 const { getIdentity, requireEmployee } = require('../lib/auth');
 const { ERR } = require('../lib/errors');
 const { str } = require('../lib/validate');
@@ -63,11 +63,12 @@ async function getMine(payload) {
   for (const weekStart of weeks) {
     const ptr = pointers[weekStart];
     if (!ptr || ptr.version <= 1) continue;
-    const prevRes = await db
-      .collection(COLLECTIONS.releaseVersions)
-      .where({ teamId: employee.teamId, weekStart, version: ptr.version - 1 })
-      .limit(1)
-      .get();
+    const prevRes = await safeGet(
+      db
+        .collection(COLLECTIONS.releaseVersions)
+        .where({ teamId: employee.teamId, weekStart, version: ptr.version - 1 })
+        .limit(1)
+    );
     const prev = prevRes.data[0];
     if (!prev) continue;
     const prevShifts = await getAll(

@@ -1,15 +1,15 @@
-const { db, _, COLLECTIONS } = require('./cloud');
+const { db, _, COLLECTIONS, safeCount } = require('./cloud');
 
 /** 草稿是否可发布：无待校对单元格、无未匹配员工行、至少一个已确认单元格 */
 async function computeBlockers(job) {
-  const pending = await db
-    .collection(COLLECTIONS.draftCells)
-    .where({ jobId: job._id, status: 'NEEDS_REVIEW' })
-    .count();
-  const total = await db
-    .collection(COLLECTIONS.draftCells)
-    .where({ jobId: job._id, status: _.in(['MANUAL', 'MATCHED']) })
-    .count();
+  const pending = await safeCount(
+    db.collection(COLLECTIONS.draftCells).where({ jobId: job._id, status: 'NEEDS_REVIEW' })
+  );
+  const total = await safeCount(
+    db
+      .collection(COLLECTIONS.draftCells)
+      .where({ jobId: job._id, status: _.in(['MANUAL', 'MATCHED']) })
+  );
   const unmatched = (job.unmatchedRows || []).length;
   return { pending: pending.total, confirmed: total.total, unmatched };
 }

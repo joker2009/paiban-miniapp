@@ -1,4 +1,9 @@
-import { getMe } from '../../services/auth';
+import {
+  getMe,
+  listBindableEmployees,
+  bindSelf,
+  type BindableEmployee,
+} from '../../services/auth';
 import { getMine } from '../../services/schedule';
 import {
   today,
@@ -46,6 +51,10 @@ interface StaleNotice {
   oldTimeText: string;
 }
 
+interface BindableOption extends BindableEmployee {
+  label: string;
+}
+
 const WEEK_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
 Page({
@@ -68,6 +77,9 @@ Page({
     weeks: [] as WeekView[],
     staleNotices: [] as StaleNotice[],
     hasAnyShift: false,
+    adminEmployees: [] as BindableOption[],
+    adminEmpIndex: 0,
+    bindingSelf: false,
   },
 
   _me: null as MeInfo | null,
@@ -92,6 +104,7 @@ Page({
       app.globalData.meLoadedAt = Date.now();
 
       if (!me.employee) {
+        await this.loadAdminBindOptions(me);
         this.setData({ loading: false, bound: false });
         return;
       }
@@ -104,6 +117,54 @@ Page({
       this.applySchedule(me, data);
     } catch (e: any) {
       this.setData({ loading: false, errorMsg: e?.message || '加载失败，请下拉重试' });
+    }
+  },
+
+  /** 管理员身份不等于员工绑定，这里给管理员提供自助绑定入口 */
+  async loadAdminBindOptions(me: MeInfo) {
+    if (!me.adminTeams || me.adminTeams.length === 0) return;
+    try {
+      const res = await listBindableEmployees();
+      const available: BindableOption[] = res.items
+        .filter((e) => !e.bound)
+        .map((e) => ({
+          ...e,
+          label: `${e.name}（${e.employeeNo}）· ${e.teamName}`,
+        }));
+      this.setData({
+        adminEmployees: available,
+        adminEmpIndex: Math.min(this.data.adminEmpIndex, Math.max(0, available.length - 1)),
+      });
+    } catch (e) {
+      console.warn('[schedule] 加载可绑定员工失败', e);
+    }
+  },
+
+  onAdminEmpChange(e: WechatMiniprogram.PickerChange) {
+    this.setData({ adminEmpIndex: Number(e.detail.value) });
+  },
+
+  async onBindSelf() {
+    const emp = this.data.adminEmployees[this.data.adminEmpIndex];
+    if (!emp || this.data.bindingSelf) return;
+    const confirmed = await new Promise<boolean>((resolve) => {
+      wx.showModal({
+        title: '绑定为我的排班',
+        content: `将把当前微信绑定到 ${emp.name}（工号 ${emp.employeeNo}），之后可在「我的排班」查看其班次。`,
+        success: (r) => resolve(r.confirm),
+      });
+    });
+    if (!confirmed) return;
+
+    this.setData({ bindingSelf: true });
+    try {
+      await bindSelf(emp.employeeId);
+      wx.showToast({ title: '绑定成功', icon: 'success' });
+      await this.load();
+    } catch (e) {
+      toastError(e, '绑定失败');
+    } finally {
+      this.setData({ bindingSelf: false });
     }
   },
 

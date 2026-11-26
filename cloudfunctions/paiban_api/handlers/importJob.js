@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { cloud, db, _, COLLECTIONS, getAll } = require('../lib/cloud');
+const { cloud, db, _, COLLECTIONS, getAll, safeGet } = require('../lib/cloud');
 const { getIdentity, requireAdmin, assertInTeam } = require('../lib/auth');
 const { ERR } = require('../lib/errors');
 const { str, arr, int } = require('../lib/validate');
@@ -118,11 +118,12 @@ async function submitJob(payload) {
     const hash = crypto.createHash('sha256').update(buf).digest('hex');
 
     if (!duplicateOf) {
-      const dup = await db
-        .collection(COLLECTIONS.importJobs)
-        .where({ teamId: job.teamId, weekStart: job.weekStart, duplicateOf: null })
-        .limit(50)
-        .get();
+      const dup = await safeGet(
+        db
+          .collection(COLLECTIONS.importJobs)
+          .where({ teamId: job.teamId, weekStart: job.weekStart, duplicateOf: null })
+          .limit(50)
+      );
       const hit = dup.data.find(
         (j) => j._id !== jobId && (j.images || []).some((im) => im.hash === hash)
       );
@@ -179,12 +180,13 @@ async function listJobs(payload) {
   requireAdmin(identity, teamId);
   if (!isValidDate(weekStart)) throw ERR.INVALID_ARGUMENT('weekStart 不合法');
 
-  const res = await db
-    .collection(COLLECTIONS.importJobs)
-    .where({ teamId, weekStart })
-    .orderBy('createdAt', 'desc')
-    .limit(50)
-    .get();
+  const res = await safeGet(
+    db
+      .collection(COLLECTIONS.importJobs)
+      .where({ teamId, weekStart })
+      .orderBy('createdAt', 'desc')
+      .limit(50)
+  );
   return { items: res.data };
 }
 

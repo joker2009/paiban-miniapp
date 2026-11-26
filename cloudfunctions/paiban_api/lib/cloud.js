@@ -21,12 +21,44 @@ const COLLECTIONS = {
   idempotency: 'pb_idempotency',
 };
 
+/** 集合不存在（首次运行、尚未创建任何数据） */
+function isCollectionNotExist(err) {
+  if (!err) return false;
+  const code = err.errCode || err.code || (err.original && err.original.errCode);
+  const msg = String(err.errMsg || err.message || '');
+  return (
+    code === -502005 ||
+    /collection.*(not exist|does not exist)/i.test(msg) ||
+    /DATABASE_COLLECTION_NOT_EXIST/i.test(msg) ||
+    /集合不存在/.test(msg)
+  );
+}
+
+/** 读查询：集合不存在时按空结果处理，避免首次运行时整页报错 */
+async function safeGet(query) {
+  try {
+    return await query.get();
+  } catch (err) {
+    if (isCollectionNotExist(err)) return { data: [] };
+    throw err;
+  }
+}
+
+async function safeCount(query) {
+  try {
+    return await query.count();
+  } catch (err) {
+    if (isCollectionNotExist(err)) return { total: 0 };
+    throw err;
+  }
+}
+
 /** 服务端分页读取全部（单页上限 1000） */
 async function getAll(query, pageSize = 1000, maxDocs = 5000) {
   const out = [];
   let skip = 0;
   for (;;) {
-    const res = await query.skip(skip).limit(pageSize).get();
+    const res = await safeGet(query.skip(skip).limit(pageSize));
     out.push(...res.data);
     if (res.data.length < pageSize) break;
     skip += pageSize;
@@ -41,7 +73,7 @@ async function getPage(query, { cursor = null, pageSize = 50 } = {}) {
   if (cursor) {
     q = q.where({ createdAt: _.lt(new Date(cursor)) });
   }
-  const res = await q.orderBy('createdAt', 'desc').limit(pageSize + 1).get();
+  const res = await safeGet(q.orderBy('createdAt', 'desc').limit(pageSize + 1));
   const items = res.data.slice(0, pageSize);
   const nextCursor = res.data.length > pageSize
     ? new Date(res.data[pageSize - 1].createdAt).toISOString()
@@ -49,4 +81,14 @@ async function getPage(query, { cursor = null, pageSize = 50 } = {}) {
   return { items, nextCursor };
 }
 
-module.exports = { cloud, db, _, COLLECTIONS, getAll, getPage };
+module.exports = {
+  cloud,
+  db,
+  _,
+  COLLECTIONS,
+  getAll,
+  getPage,
+  safeGet,
+  safeCount,
+  isCollectionNotExist,
+};

@@ -4,9 +4,42 @@
   </view>
 
   <view class="card" wx:elif="{{!bound}}">
-    <view class="title">尚未绑定</view>
-    <view class="subtitle">绑定后即可查看你的个人排班</view>
-    <button class="btn" style="margin-top: 24rpx;" bindtap="goBind">输入邀请码绑定</button>
+    <view class="title">尚未绑定员工记录</view>
+    <view class="subtitle">管理员身份不等于员工绑定，需要选择一条员工记录作为你自己的排班。</view>
+
+    <block wx:if="{{adminEmployees.length > 0}}">
+      <picker
+        range="{{adminEmployees}}"
+        range-key="label"
+        value="{{adminEmpIndex}}"
+        bindchange="onAdminEmpChange"
+      >
+        <view class="input picker-value">
+          {{adminEmployees[adminEmpIndex].label}}
+        </view>
+      </picker>
+      <button
+        class="btn"
+        style="margin-top: 20rpx;"
+        bindtap="onBindSelf"
+        loading="{{bindingSelf}}"
+        disabled="{{bindingSelf}}"
+      >
+        绑定为我的排班
+      </button>
+      <button class="btn btn-ghost" style="margin-top: 12rpx;" bindtap="goBind">
+        改用邀请码绑定
+      </button>
+    </block>
+
+    <block wx:else>
+      <button class="btn" style="margin-top: 24rpx;" bindtap="goBind">
+        输入邀请码绑定
+      </button>
+      <view class="muted" style="margin-top: 16rpx;">
+        你是管理员：可先到「排班管理 → 成员管理」添加员工，再回来绑定自己。
+      </view>
+    </block>
   </view>
 
   <view class="card" wx:elif="{{errorMsg}}">

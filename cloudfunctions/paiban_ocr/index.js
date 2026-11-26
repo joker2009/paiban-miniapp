@@ -14,6 +14,21 @@ const C = {
   shiftTypes: 'pb_shiftTypes',
 };
 
+
+/** 集合未创建时按空结果处理 */
+async function safeGet(query) {
+  try {
+    return await query.get();
+  } catch (err) {
+    const code = err && (err.errCode || err.code);
+    const msg = String((err && (err.errMsg || err.message)) || '');
+    if (code === -502005 || /collection.*not exist/i.test(msg) || /集合不存在/.test(msg)) {
+      return { data: [] };
+    }
+    throw err;
+  }
+}
+
 const WEEK_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const MAX_JOBS_PER_TICK = 2;
 const STALE_MS = 3 * 60 * 1000;
@@ -88,7 +103,7 @@ async function recognizeImage(job, image, pageIndex) {
 }
 
 async function loadShiftMap(teamId) {
-  const res = await db.collection(C.shiftTypes).where({ teamId }).limit(200).get();
+  const res = await safeGet(db.collection(C.shiftTypes).where({ teamId }).limit(200));
   const byToken = new Map();
   const byCode = new Map();
   for (const s of res.data) {
@@ -104,7 +119,7 @@ async function loadShiftMap(teamId) {
 }
 
 async function loadEmployees(teamId) {
-  const res = await db.collection(C.employees).where({ teamId }).limit(1000).get();
+  const res = await safeGet(db.collection(C.employees).where({ teamId }).limit(1000));
   const map = new Map();
   for (const e of res.data) {
     if (e.status !== 'ACTIVE') continue; // 停用员工按未匹配处理，需管理员介入
@@ -224,7 +239,7 @@ async function getAllCells(jobId, where = {}) {
   const out = [];
   let skip = 0;
   for (;;) {
-    const res = await db.collection(C.cells).where({ jobId, ...where }).skip(skip).limit(100).get();
+    const res = await safeGet(db.collection(C.cells).where({ jobId, ...where }).skip(skip).limit(100));
     out.push(...res.data);
     if (res.data.length < 100) break;
     skip += 100;
@@ -235,7 +250,7 @@ async function getAllCells(jobId, where = {}) {
 
 async function removePageCells(jobId, pageIndex) {
   for (;;) {
-    const res = await db.collection(C.cells).where({ jobId, pageIndex }).limit(100).get();
+    const res = await safeGet(db.collection(C.cells).where({ jobId, pageIndex }).limit(100));
     if (res.data.length === 0) break;
     for (const c of res.data) await db.collection(C.cells).doc(c._id).remove();
   }
@@ -427,12 +442,13 @@ async function poll() {
     .update({ data: { status: 'PENDING_OCR' } })
     .catch(() => {});
 
-  const res = await db
-    .collection(C.jobs)
-    .where({ status: 'PENDING_OCR' })
-    .orderBy('updatedAt', 'asc')
-    .limit(MAX_JOBS_PER_TICK)
-    .get();
+  const res = await safeGet(
+    db
+      .collection(C.jobs)
+      .where({ status: 'PENDING_OCR' })
+      .orderBy('updatedAt', 'asc')
+      .limit(MAX_JOBS_PER_TICK)
+  );
 
   const results = [];
   for (const job of res.data) {

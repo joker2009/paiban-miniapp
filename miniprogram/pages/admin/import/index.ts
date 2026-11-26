@@ -1,5 +1,7 @@
 import { createJob, uploadImage, submitJob } from '../../../services/importJob';
+import { getMe } from '../../../services/auth';
 import { toastError } from '../../../utils/cloud';
+import { mondayOf, today, isValidDate } from '../../../utils/date';
 import { MAX_IMAGES_PER_JOB, MAX_IMAGE_BYTES } from '../../../config/index';
 
 interface PickedFile {
@@ -13,9 +15,13 @@ interface PickedFile {
 Page({
   data: {
     teamId: '',
+    teamName: '',
     weekStart: '',
     files: [] as PickedFile[],
     uploading: false,
+    resolving: false,
+    noAccess: false,
+    teams: [] as Array<{ teamId: string; teamName: string }>,
     progressText: '',
     maxCount: MAX_IMAGES_PER_JOB,
     maxSizeText: '10MB',
@@ -26,10 +32,56 @@ Page({
   _filesSignature: '',
 
   onLoad(options: Record<string, string>) {
+    // 允许在开发者工具里直接编译本页：缺参数时回退到本周一，并自动解析团队
+    const weekStart = isValidDate(options.weekStart || '')
+      ? options.weekStart
+      : mondayOf(today());
+    let teamName = options.teamName || '';
+    try {
+      if (teamName) teamName = decodeURIComponent(teamName);
+    } catch (e) {
+      // 保持原值即可
+    }
+
     this.setData({
       teamId: options.teamId || '',
-      weekStart: options.weekStart || '',
+      teamName,
+      weekStart,
     });
+
+    if (!options.teamId || !teamName) {
+      this.resolveTeam();
+    }
+  },
+
+  async resolveTeam() {
+    this.setData({ resolving: true });
+    try {
+      const me = await getMe();
+      const teams = me.adminTeams || [];
+      if (teams.length === 0) {
+        this.setData({ noAccess: true });
+        return;
+      }
+      const current = teams.find((t) => t.teamId === this.data.teamId) || teams[0];
+      this.setData({
+        teams,
+        teamId: current.teamId,
+        teamName: current.teamName,
+        noAccess: false,
+      });
+    } catch (e) {
+      toastError(e, '无法获取团队信息');
+    } finally {
+      this.setData({ resolving: false });
+    }
+  },
+
+  onTeamChange(e: WechatMiniprogram.PickerChange) {
+    const team = this.data.teams[Number(e.detail.value)];
+    if (!team) return;
+    this.setData({ teamId: team.teamId, teamName: team.teamName });
+    this.resetJob();
   },
 
   /** 主入口：从微信聊天选择图片（用户手动选图，不读取聊天记录） */
@@ -147,8 +199,12 @@ Page({
   async onSubmit() {
     if (this.data.uploading) return;
     const { files, teamId, weekStart } = this.data;
-    if (!teamId || !weekStart) {
-      wx.showToast({ title: '缺少团队或周次参数', icon: 'none' });
+    if (!teamId) {
+      wx.showToast({ title: '请先选择团队，或返回排班管理重新进入', icon: 'none' });
+      return;
+    }
+    if (!weekStart) {
+      wx.showToast({ title: '缺少周次参数', icon: 'none' });
       return;
     }
     if (files.length === 0) {

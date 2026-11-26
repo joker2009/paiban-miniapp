@@ -1,4 +1,4 @@
-const { db, _, COLLECTIONS, getAll } = require('../lib/cloud');
+const { db, _, COLLECTIONS, getAll, safeGet } = require('../lib/cloud');
 const { getIdentity, requireAdmin } = require('../lib/auth');
 const { ERR } = require('../lib/errors');
 const { str, int, arr } = require('../lib/validate');
@@ -53,7 +53,9 @@ async function saveCells(payload) {
   }
 
   const patches = arr(payload.patches, '修改项', { min: 1, max: 200 });
-  const shiftRes = await db.collection(COLLECTIONS.shiftTypes).where({ teamId: job.teamId }).limit(200).get();
+  const shiftRes = await safeGet(
+    db.collection(COLLECTIONS.shiftTypes).where({ teamId: job.teamId }).limit(200)
+  );
   const shiftMap = {};
   for (const s of shiftRes.data) shiftMap[s.code] = s;
 
@@ -102,10 +104,11 @@ async function saveCells(payload) {
   for (const key of touchedRows) {
     const [rowKey, workDate] = key.split('|');
     if (!workDate) continue;
-    const siblings = await db
-      .collection(COLLECTIONS.draftCells)
-      .where({ jobId, rowKey, workDate, status: 'NEEDS_REVIEW' })
-      .get();
+    const siblings = await safeGet(
+      db
+        .collection(COLLECTIONS.draftCells)
+        .where({ jobId, rowKey, workDate, status: 'NEEDS_REVIEW' })
+    );
     for (const s of siblings.data) {
       await db.collection(COLLECTIONS.draftCells).doc(s._id).update({
         data: { status: 'SUPERSEDED', issues: [], updatedAt: now },
