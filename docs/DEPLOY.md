@@ -4,6 +4,22 @@
 > `paiban_bootstrap` 已停用（仓库和云端均为禁用桩），第 7 节及管理员相关步骤仅保留作历史参考，请勿执行。  
 > 实际流程：日历首页 → 导入排班图 → 选自己 → 校对保存 → 加系统日历。
 
+## 0. 当前模式（员工自助）部署清单
+
+1. 部署两个函数：`paiban_api`、`paiban_ocr`。**不要部署 `paiban_bootstrap`**（已是禁用桩）。
+2. 环境变量：
+
+   | 函数 | 变量 |
+   | --- | --- |
+   | `paiban_api` | `INTERNAL_TOKEN=<随机串>` |
+   | `paiban_ocr` | `DEEPSEEK_API_KEY`、`DEEPSEEK_MODEL=deepseek-flash`、`DEEPSEEK_THINKING=disabled`、`DEEPSEEK_MAX_TOKENS=4000`、`INTERNAL_TOKEN`（与 api 一致） |
+
+3. 两个函数超时都设为 **60 秒**（云函数间调用有 15 秒限制，所以识别走了异步任务，但单次 OCR 仍需 60 秒）。
+4. 给 `paiban_ocr` 建定时触发器：`*/20 * * * * * *`（异步任务兜底）。
+5. 首次运行任意 `paiban_api` 操作会自动创建全部 `pb_*` 集合；随后在控制台把所有集合权限设为「仅云函数可读写」。
+6. 编译小程序：日历首页 → 导入排班图 → 识别 → 选自己 → 校对 → 保存。
+7. 系统日历请用真机验证，开发者工具不能作为验收依据。
+
 ## 1. 前置
 
 - 微信小程序 AppID（已关联云开发）

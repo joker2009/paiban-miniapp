@@ -11,3 +11,6 @@ cloudfunctions/**/node_modules/
 .tmp/
 coverage/
 dist/
+
+# 含真实员工信息的测试样图，不要提交
+测试图片*/

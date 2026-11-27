@@ -2,40 +2,56 @@
 
 <img src="assets/icon-1024.png" width="96" align="right" alt="排班助手图标" />
 
-从微信聊天选图 → OCR 识别排班表 → 选自己 → 校对保存 → 月历查看并添加到手机日历。
+把群里的排班图，变成每个人自己的班表。
 
-> 当前为**员工自助模式**：不需要团队、管理员、邀请码或发布流程。管理员相关页面仅保留代码，不在入口中展示。
+**当前为员工自助模式**：每个员工自己选图、识别、选自己的名字、保存并加到手机日历。不需要团队、管理员、邀请码或发布流程。
 
-> 上架用图标、简介、类目与隐私声明见 [`docs/STORE.md`](docs/STORE.md)。
+> 上架用图标、简介、类目与隐私声明见 [`docs/STORE.md`](docs/STORE.md)。  
+> 架构、数据模型与接口见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。  
+> 部署与环境变量见 [`docs/DEPLOY.md`](docs/DEPLOY.md)。
 
-- 技术栈：原生微信小程序（TypeScript）+ 微信云开发（云函数 / 云数据库 / 私有存储，支持环境共享）
-- OCR：DeepSeek 视觉大模型（OpenAI 兼容接口），可插拔；开发联调用 `cloudfunctions/paiban_ocr`
-- 设计依据：`排班助手小程序设计文档.md`（v1.0 MVP）
-- 时区：固定 `Asia/Shanghai`，一周为周一至周日
+## 功能
+
+- **选图**：从微信聊天或相册选 1–5 张排班图
+- **识别**：DeepSeek 视觉模型识别表格；日期以图片表头为准，支持跨周
+- **异步任务**：创建识别任务后轮询结果，避开云函数间 15 秒调用上限
+- **选自己**：识别名单可搜索；设置里的姓名/工号会优先匹配并自动选中
+- **原图核对**：选人页和校对页都能查看原图并放大
+- **校对保存**：可直接改每天的班次文字，设置每个班次的起止时间与提醒
+- **小程序月历**：左右滑动切月（带滑入动效）、查看每天班次
+- **编辑班次**：日历里点日期可编辑或删除当天班次，应对后续调班
+- **系统日历**：单条添加、本周/本月批量添加，提前 30 分钟提醒
+
+## 技术栈
+
+- 原生微信小程序（TypeScript）
+- 微信云开发：云函数、云数据库、私有存储，支持环境共享
+- OCR：DeepSeek 视觉模型（OpenAI 兼容接口）
+- 时区：固定 `Asia/Shanghai`
 
 ## 目录
 
 ```
-miniprogram/                 小程序（原生 TS）
+miniprogram/
   app.ts / app.json / app.wxss
-  config/index.ts            环境 ID、限额（需要替换 CLOUD_ENV_ID）
+  config/index.ts            环境 ID、共享环境配置、限额
   pages/
-    schedule/                我的排班（员工）
-    bind/                    个人绑定（邀请码）
-    admin/                   排班管理（管理员）
-      import/                导入排班图（聊天选图 / 相册）
-      review/                校对与发布
-      shifts/                班次字典
-      members/               成员与邀请码
-  services/                  云函数调用封装
+    calendar/                月历首页（切月、编辑、批量加日历）
+    import/                  选图 → 识别 → 选人 → 校对 → 保存
+    settings/                个人设置（姓名、工号）
+    schedule/ bind/ admin/   旧团队模式页面，代码保留但不在入口
+  services/personal.ts       员工自助接口封装
   utils/                     日期、云调用、本机日历记录
 cloudfunctions/
   paiban_api/                所有业务操作（按 op 路由）
-  paiban_ocr/                DeepSeek 识别 + 定时兜底 + 原图过期清理
-  paiban_bootstrap/          一次性初始化（用完删除）
+  paiban_ocr/                DeepSeek 识别、异步任务、定时兜底
+  paiban_bootstrap/          已停用（禁用桩，防止误恢复初始化能力）
   cloudbase_auth/            环境共享鉴权（部署在资源方环境）
+docs/
+  DEPLOY.md                  部署、环境变量、集合索引
+  STORE.md                   上架图标、简介、类目
+  ARCHITECTURE.md            当前架构与数据模型
 tests/                       纯 Node 单测（日期/解析）
-docs/DEPLOY.md               部署、环境变量、集合索引、真机验收
 ```
 
 ## 快速开始
@@ -46,29 +62,57 @@ npm run typecheck
 npm test
 ```
 
-1. `project.config.json` 填入你的 `appid`。
-2. `miniprogram/config/index.ts` 填入云开发 `CLOUD_ENV_ID`。
-3. 用微信开发者工具打开本目录，按 `docs/DEPLOY.md` 部署云函数、配置环境变量和数据库权限。
-4. 用 `paiban_bootstrap` 云函数建团队/管理员/示例班次/员工，给员工发邀请码。
+1. `project.config.json` 填入 `appid`
+2. `miniprogram/config/index.ts` 填入云开发环境
+3. 按 `docs/DEPLOY.md` 部署两个云函数并配置环境变量
+4. 开发者工具编译，授予日历相关隐私权限后开始测试
 
-## 关键约束（与设计文档一致）
+## 数据模型
 
-- 身份只取云函数受信任上下文；前端传入的 `openid`/角色/员工 ID 一律不信任。
-- 员工只能读自己的已发布排班；原图、草稿、花名册仅管理员可见。
-- 发布采用「先写完整快照 → 校验数量 → 事务切换版本指针」，发布幂等键去重。
-- 草稿乐观锁 `revision`；并发发布返回 `VERSION_CONFLICT`。
-- 添加到手机日历必须从点击回调内调用 `wx.addPhoneCalendar`，提前 30 分钟；仅回调成功后记本机添加记录。
-- 原图与完整 OCR 文本默认保留 7 天，不影响已发布结构化排班。
+| 集合 | 用途 |
+| --- | --- |
+| `pb_personal_schedules` | 每人每周一份文档：`openid + weekStart`，内含该周班次数组 |
+| `pb_user_profiles` | 个人设置：姓名、工号、班次时间偏好 |
+| `pb_ocr_tasks` | 异步识别任务：`PENDING → RUNNING → DONE / FAILED` |
 
-## 云函数操作（`paiban_api`）
+首次调用 `paiban_api` 时会自动补齐全部 `pb_*` 集合（`ensureCollections`）。
 
-`auth.getMe` / `auth.bindInvite`；`admin.listEmployees|saveEmployee|issueInvite|revokeInvite|listInvites|listShiftTypes|saveShiftType`；`import.createJob|submitJob|listJobs|getJob|retryFailed|removeFailedImage|getImagePreview`；`draft.listCells|saveCells|linkRow`；`release.preview|publish|listHistory`；`schedule.getMine`。
+旧的团队模式集合（`pb_teams`、`pb_admins`、`pb_importJobs` 等）仍可能存在，但当前流程不再读写。
 
-统一返回 `{ ok, data | code, message, requestId }`；错误码含 `FORBIDDEN`、`INVITE_INVALID`、`FILE_INVALID`、`OCR_FAILED`、`REVIEW_REQUIRED`、`DRAFT_CONFLICT`、`VERSION_CONFLICT`。
+## 接口（`paiban_api`）
 
-## 已知边界（首版）
+| 操作 | 说明 |
+| --- | --- |
+| `auth.getMe` | 取 openid（不涉及角色/绑定） |
+| `personal.getMine` | 按日期范围读取自己的班次与设置 |
+| `personal.saveWeek` | 保存/合并班次，按实际日期分组到周 |
+| `personal.saveShift` / `personal.deleteShift` | 编辑/删除单天班次 |
+| `personal.recognize` | 创建识别任务，返回 `taskId` |
+| `personal.getRecognizeTask` | 轮询识别结果 |
+| `personal.getProfile` / `personal.saveProfile` | 读取/保存姓名、工号与班次偏好 |
 
-- 一周一个团队一个当前发布版本；同一员工同一天最多一个班次。
-- 班次字典示例时间仅用于联调，不能直接作为真实配置上线。
-- 不监听微信群、不自动发布、不读写系统日历（只调用系统提供的“添加日程”）。
-- 小程序关闭时不做主动调班推送；员工打开或刷新「我的排班」时呈现变更。
+旧的 `admin.*`、`import.*`、`draft.*`、`release.*`、`schedule.*` 操作仍保留在代码里，但当前入口不再使用。
+
+## OCR 流程
+
+1. 客户端上传图片到 `imports/personal/<openid>/...`
+2. `personal.recognize` 建任务并唤醒 `paiban_ocr`
+3. `paiban_ocr` 下载图片，调用 DeepSeek，返回 `dates + employees + cells`
+4. 客户端每 2 秒轮询 `personal.getRecognizeTask`，单图最多等 3 分钟
+5. 定时触发器每 20 秒兜底处理未启动的任务
+
+关键参数：
+
+- `DEEPSEEK_MODEL=deepseek-flash`
+- `thinking: { type: "disabled" }`（关闭推理，避免 token 被思维链吃光）
+- 提示词要求先输出图片表头的 `dates`，`cells` 按列对齐
+- 两个函数超时 60 秒
+
+## 已知边界
+
+- 识别按图片表头的日期写入；完全读不到日期时才回退到所选周
+- 同一员工同一天只保存一条班次
+- 微信不开放修改/删除系统日历事件：调班后需手动删除旧日程再重新添加
+- 批量写系统日历受微信/系统限制，失败可重试或逐条添加
+- 上传原图目前保留在云存储，尚未做自动清理
+- 旧的管理员/邀请码/发布能力不在入口中展示
