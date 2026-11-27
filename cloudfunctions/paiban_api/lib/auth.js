@@ -18,7 +18,7 @@ async function getIdentity() {
 
   const adminTeams = [];
   for (const a of adminRes.data) {
-    if (a.appId && a.appId !== appId) continue;
+    // 不按 appId 过滤：openid 本身已按小程序隔离；共享环境下 appId 可能来自不同上下文
     const team = await db.collection(COLLECTIONS.teams).doc(a.teamId).get().catch(() => null);
     if (team && team.data) {
       adminTeams.push({

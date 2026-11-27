@@ -35,6 +35,9 @@ function normalizeRect(rect) {
  */
 function parseRecognition(text) {
   const json = extractJson(text);
+  const dates = Array.isArray(json.dates)
+    ? json.dates.map((d) => String(d || '').trim()).filter(Boolean)
+    : [];
   const employees = Array.isArray(json.employees) ? json.employees : Array.isArray(json.rows) ? json.rows : [];
   const rows = employees.map((e, idx) => {
     const cellsRaw = Array.isArray(e.cells) ? e.cells : Array.isArray(e.days) ? e.days : [];
@@ -43,26 +46,31 @@ function parseRecognition(text) {
       name: e.name != null ? String(e.name).trim() : '',
       rowIndex: idx,
       cells: cellsRaw.map((c, ci) => {
-        const dateRaw = c.date != null ? String(c.date).trim() : '';
+        // 兼容两种模型输出：cells 为纯文本数组，或 {date,text} 对象
+        if (typeof c === 'string') {
+          return { date: null, text: c.trim(), confidence: null, rect: null, cellIndex: ci };
+        }
+        const obj = c || {};
+        const dateRaw = obj.date != null ? String(obj.date).trim() : '';
         let date = null;
         const m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(dateRaw);
         if (m) {
           date = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-        } else if (/^\d{1,2}[-/.]\d{1,2}$/.test(dateRaw)) {
-          date = dateRaw; // 缺年份，交由上层按周补齐
+        } else if (/^\d{1,2}[-/.]\d{1,2}$/.test(dateRaw) || /^\d{1,2}月\d{1,2}日?$/.test(dateRaw)) {
+          date = dateRaw; // 缺年份，交由上层补齐
         }
         return {
           date,
-          text: c.text != null ? String(c.text).trim() : '',
+          text: obj.text != null ? String(obj.text).trim() : '',
           confidence:
-            typeof c.confidence === 'number' && Number.isFinite(c.confidence) ? c.confidence : null,
-          rect: normalizeRect(c.rect),
+            typeof obj.confidence === 'number' && Number.isFinite(obj.confidence) ? obj.confidence : null,
+          rect: normalizeRect(obj.rect),
           cellIndex: ci,
         };
       }),
     };
   });
-  return { rows, notes: typeof json.notes === 'string' ? json.notes : '' };
+  return { rows, dates, notes: typeof json.notes === 'string' ? json.notes : '' };
 }
 
 module.exports = { parseRecognition, extractJson };

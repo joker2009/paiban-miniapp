@@ -21,8 +21,10 @@ function chatVision({ messages, timeoutMs = 120000, responseFormat = null }) {
     model,
     messages,
     temperature: 0,
-    max_tokens: Number(process.env.DEEPSEEK_MAX_TOKENS || 8000),
+    max_tokens: Number(process.env.DEEPSEEK_MAX_TOKENS || 4000),
     stream: false,
+    // 排班表识别只需要结果，不需要思维链；避免推理 token 吃满预算
+    thinking: { type: process.env.DEEPSEEK_THINKING || 'disabled' },
   };
   if (responseFormat) body.response_format = responseFormat;
 
@@ -54,14 +56,18 @@ function chatVision({ messages, timeoutMs = 120000, responseFormat = null }) {
           }
           try {
             const json = JSON.parse(text);
-            const content = json.choices && json.choices[0] && json.choices[0].message
-              ? json.choices[0].message.content
-              : '';
+            const choice = json.choices && json.choices[0];
+            let content = choice && choice.message ? choice.message.content : '';
+            if (Array.isArray(content)) {
+              content = content.map((item) => (item && item.text) || '').join('');
+            }
             if (!content) {
-              reject(new Error('DEEPSEEK_EMPTY_RESPONSE'));
+              const finish = choice && choice.finish_reason ? choice.finish_reason : 'unknown';
+              const usage = json.usage ? JSON.stringify(json.usage) : '';
+              reject(new Error(`DEEPSEEK_EMPTY_RESPONSE finish=${finish} usage=${usage}`));
               return;
             }
-            resolve(content);
+            resolve(String(content));
           } catch (e) {
             reject(new Error(`DEEPSEEK_BAD_RESPONSE: ${text.slice(0, 200)}`));
           }

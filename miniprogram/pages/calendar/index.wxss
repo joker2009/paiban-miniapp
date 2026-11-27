@@ -1,0 +1,185 @@
+.month-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 24rpx;
+}
+
+.month-nav {
+  width: 72rpx;
+  height: 72rpx;
+  line-height: 68rpx;
+  text-align: center;
+  font-size: 44rpx;
+  color: var(--brand);
+}
+
+.month-info {
+  text-align: center;
+}
+
+.settings-link {
+  color: var(--brand);
+  font-size: 26rpx;
+  padding: 4rpx 8rpx;
+}
+
+.month-title {
+  font-size: 34rpx;
+  font-weight: 600;
+}
+
+.calendar.slide-next {
+  animation: slideNext 0.28s ease-out;
+}
+
+.calendar.slide-prev {
+  animation: slidePrev 0.28s ease-out;
+}
+
+@keyframes slideNext {
+  from {
+    transform: translateX(18%);
+    opacity: 0.3;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slidePrev {
+  from {
+    transform: translateX(-18%);
+    opacity: 0.3;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.weekday-row {
+  display: flex;
+  padding-bottom: 12rpx;
+  border-bottom: 1rpx solid var(--border);
+}
+
+.weekday {
+  flex: 1;
+  text-align: center;
+  font-size: 24rpx;
+  color: var(--text-weak);
+}
+
+.week-row {
+  display: flex;
+}
+
+.day-cell {
+  flex: 1;
+  min-height: 110rpx;
+  padding: 10rpx 2rpx 8rpx;
+  text-align: center;
+  border-radius: 12rpx;
+  box-sizing: border-box;
+}
+
+.day-out .day-num {
+  color: #c8ccd4;
+}
+
+.day-today {
+  background: var(--brand-weak);
+}
+
+.day-num {
+  font-size: 26rpx;
+  color: var(--text);
+}
+
+.day-label {
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  color: var(--brand);
+  line-height: 1.2;
+  word-break: break-all;
+}
+
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 101;
+  background: #fff;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 32rpx 24rpx calc(48rpx + env(safe-area-inset-bottom));
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.shift-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid var(--border);
+}
+
+.shift-row:last-of-type {
+  border-bottom: none;
+}
+
+.shift-main {
+  flex: 1;
+}
+
+.shift-actions {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  flex-shrink: 0;
+}
+
+.mini {
+  font-size: 26rpx;
+  color: var(--brand);
+}
+
+.picker-value {
+  display: flex;
+  align-items: center;
+}
+
+.batch-stats {
+  display: flex;
+  gap: 16rpx;
+  margin: 24rpx 0;
+}
+
+.batch-stat {
+  flex: 1;
+  text-align: center;
+  background: #f7f8fa;
+  border-radius: 16rpx;
+  padding: 20rpx 0;
+}
+
+.batch-num {
+  font-size: 44rpx;
+  font-weight: 600;
+  color: var(--brand);
+}
+
+.shift-title {
+  font-size: 30rpx;
+  font-weight: 600;
+}

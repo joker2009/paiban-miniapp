@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { cloud } = require('./lib/cloud');
+const { cloud, ensureCollections } = require('./lib/cloud');
 const { AppError } = require('./lib/errors');
 
 const handlers = {
@@ -8,6 +8,16 @@ const handlers = {
   'auth.listBindableEmployees': require('./handlers/auth').listBindableEmployees,
   'auth.bindSelf': require('./handlers/auth').bindSelf,
   'auth.createSelfEmployee': require('./handlers/auth').createSelfEmployee,
+  'dev.ensureTestSetup': require('./handlers/dev').ensureTestSetup,
+
+  'personal.getMine': require('./handlers/personal').getMine,
+  'personal.saveWeek': require('./handlers/personal').saveWeek,
+  'personal.recognize': require('./handlers/personal').recognize,
+  'personal.getRecognizeTask': require('./handlers/personal').getRecognizeTask,
+  'personal.getProfile': require('./handlers/personal').getProfile,
+  'personal.saveProfile': require('./handlers/personal').saveProfile,
+  'personal.saveShift': require('./handlers/personal').saveShift,
+  'personal.deleteShift': require('./handlers/personal').deleteShift,
 
   'admin.listEmployees': require('./handlers/admin').listEmployees,
   'admin.saveEmployee': require('./handlers/admin').saveEmployee,
@@ -47,6 +57,8 @@ exports.main = async (event) => {
   }
 
   try {
+    // 首次调用时补齐缺失集合；失败不阻断业务，由具体操作报错
+    await ensureCollections();
     const data = await handler(payload, { requestId, cloud });
     return { ok: true, data, requestId };
   } catch (err) {

@@ -1,0 +1,224 @@
+<view class="page">
+  <view class="card month-head">
+    <view class="month-nav" bindtap="prevMonth">‹</view>
+    <view class="month-info">
+      <view class="month-title">{{monthLabel}}</view>
+      <view class="muted" wx:if="{{employeeName}}">{{employeeName}}</view>
+    </view>
+    <view class="month-nav" bindtap="nextMonth">›</view>
+  </view>
+
+  <view class="row-between" style="padding: 0 8rpx 12rpx;">
+    <view class="muted">左右滑动日历可切换月份</view>
+    <view class="row" style="gap: 24rpx;">
+      <view class="settings-link" bindtap="openBatch">批量加日历</view>
+      <view class="settings-link" bindtap="goSettings">个人设置</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <button class="btn" bindtap="goImport">导入排班图</button>
+    <view class="muted" style="text-align:center; margin-top:12rpx;">
+      选择群里的排班图，识别后选自己的名字
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{loading}}">
+    <view class="empty">加载中…</view>
+  </view>
+
+  <view class="card" wx:elif="{{errorMsg}}">
+    <view class="empty">{{errorMsg}}</view>
+    <button class="btn btn-secondary" bindtap="retry">重试</button>
+  </view>
+
+  <view
+    class="card calendar {{animClass}}"
+    wx:else
+    bindtouchstart="onTouchStart"
+    bindtouchend="onTouchEnd"
+  >
+    <view class="weekday-row">
+      <view class="weekday" wx:for="{{dayNames}}" wx:key="*this">{{item}}</view>
+    </view>
+
+    <view class="week-row" wx:for="{{weeks}}" wx:for-item="week" wx:key="weekStart">
+      <view
+        class="day-cell {{day.inMonth ? '' : 'day-out'}} {{day.isToday ? 'day-today' : ''}}"
+        wx:for="{{week.days}}"
+        wx:for-item="day"
+        wx:key="date"
+        data-date="{{day.date}}"
+        bindtap="openDay"
+      >
+        <view class="day-num">{{day.day}}</view>
+        <view class="day-label" wx:if="{{day.hasShift}}">{{day.labels}}</view>
+      </view>
+    </view>
+
+    <view class="muted" style="text-align:center; margin-top:16rpx;" wx:if="{{!hasAnyShift}}">
+      本月还没有班表，点上方「导入排班图」开始
+    </view>
+  </view>
+</view>
+
+<view class="mask" wx:if="{{selectedVisible}}" bindtap="closeDay"></view>
+<view class="sheet" wx:if="{{selectedVisible}}">
+  <view class="row-between">
+    <view class="title">{{selectedDateText}}</view>
+    <view class="muted" bindtap="closeDay">关闭</view>
+  </view>
+
+  <view class="empty" wx:if="{{selectedShifts.length === 0}}">当天没有排班</view>
+
+  <view class="shift-row" wx:for="{{selectedShifts}}" wx:key="workDate">
+    <view class="shift-main">
+      <view class="shift-title">{{item.title}}</view>
+      <view class="muted">{{item.timeText}}</view>
+      <view class="tag tag-muted" wx:if="{{item.localAdded}}">本机已添加</view>
+    </view>
+    <view class="shift-actions">
+      <text class="mini" data-index="{{index}}" bindtap="openEdit">编辑</text>
+      <button
+        wx:if="{{item.canAdd}}"
+        class="btn btn-ghost btn-sm"
+        data-index="{{index}}"
+        bindtap="onAddShift"
+      >
+        {{item.localAdded ? '重新添加' : '加日历'}}
+      </button>
+    </view>
+  </view>
+
+  <button
+    wx:if="{{selectedShifts.length === 0}}"
+    class="btn btn-ghost"
+    style="margin-top: 20rpx;"
+    bindtap="openCreate"
+  >
+    手动添加班次
+  </button>
+  <view class="muted" wx:else style="text-align: center; margin-top: 16rpx;" bindtap="openCreate">
+    + 覆盖当天班次
+  </view>
+
+  <button
+    wx:if="{{selectedWeekCount > 0}}"
+    class="btn btn-secondary"
+    style="margin-top: 24rpx;"
+    bindtap="onBatchWeek"
+    loading="{{batchBusy}}"
+    disabled="{{batchBusy}}"
+  >
+    添加本周全部（{{selectedWeekCount}} 条）
+  </button>
+  <view class="muted" style="margin-top: 12rpx;">
+    批量添加受微信与系统日历限制，若部分失败可逐条添加。
+  </view>
+</view>
+
+<!-- 批量添加 -->
+<view class="mask" wx:if="{{batchVisible}}" bindtap="closeBatch"></view>
+<view class="sheet" wx:if="{{batchVisible}}">
+  <view class="title">批量添加到系统日历</view>
+  <view class="muted" style="margin-top: 6rpx;">只添加尚未添加、且还没有结束的班次。</view>
+
+  <view class="batch-stats">
+    <view class="batch-stat">
+      <view class="batch-num">{{weekCount}}</view>
+      <view class="muted">本周可添加</view>
+    </view>
+    <view class="batch-stat">
+      <view class="batch-num">{{monthCount}}</view>
+      <view class="muted">本月可添加</view>
+    </view>
+  </view>
+
+  <button
+    class="btn"
+    data-scope="week"
+    bindtap="onBatchAdd"
+    disabled="{{batchBusy || weekCount === 0}}"
+    loading="{{batchBusy}}"
+  >
+    添加本周（{{weekCount}} 条）
+  </button>
+  <button
+    class="btn btn-secondary"
+    style="margin-top: 12rpx;"
+    data-scope="month"
+    bindtap="onBatchAdd"
+    disabled="{{batchBusy || monthCount === 0}}"
+  >
+    添加本月（{{monthCount}} 条）
+  </button>
+
+  <view class="muted" style="text-align: center; margin-top: 16rpx;" wx:if="{{batchBusy}}">
+    正在添加 {{batchProgress}}…
+  </view>
+  <view class="muted" style="margin-top: 16rpx;">
+    微信和系统日历可能限制一次点击内的连续写入；失败可再点一次或逐条添加。
+  </view>
+  <button class="btn btn-ghost" style="margin-top: 16rpx;" bindtap="closeBatch" disabled="{{batchBusy}}">
+    取消
+  </button>
+</view>
+
+<!-- 编辑班次 -->
+<view class="mask" wx:if="{{editVisible}}" bindtap="closeEdit"></view>
+<view class="sheet" wx:if="{{editVisible}}">
+  <view class="title">{{editIsNew ? '添加班次' : '编辑班次'}} · {{edit.workDate}}</view>
+
+  <view class="form-item" style="margin-top: 24rpx;">
+    <text class="form-label">班次名称</text>
+    <input class="input" value="{{edit.label}}" bindinput="onEditField" placeholder="如 夜班" />
+  </view>
+
+  <view class="form-item">
+    <text class="form-label">类型</text>
+    <picker range="{{categories}}" value="{{edit.categoryIndex}}" bindchange="onEditCategory">
+      <view class="input picker-value">{{categories[edit.categoryIndex]}}</view>
+    </picker>
+  </view>
+
+  <block wx:if="{{edit.categoryIndex !== 1}}">
+    <view class="form-item">
+      <text class="form-label">开始时间</text>
+      <picker mode="time" value="{{edit.startLocal}}" data-field="startLocal" bindchange="onEditTime">
+        <view class="input picker-value">{{edit.startLocal || '选择时间'}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">结束时间</text>
+      <picker mode="time" value="{{edit.endLocal}}" data-field="endLocal" bindchange="onEditTime">
+        <view class="input picker-value">{{edit.endLocal || '选择时间'}}</view>
+      </picker>
+    </view>
+    <view class="switch-row">
+      <view class="muted">结束于次日</view>
+      <switch checked="{{edit.endDayOffset === 1}}" bindchange="onEditOffset" color="#1f6feb" />
+    </view>
+    <view class="switch-row">
+      <view class="muted">上班前 30 分钟提醒</view>
+      <switch checked="{{edit.reminderEnabled}}" bindchange="onEditReminder" color="#1f6feb" />
+    </view>
+  </block>
+
+  <button class="btn" style="margin-top: 20rpx;" bindtap="saveEdit" loading="{{editSaving}}" disabled="{{editSaving}}">
+    保存
+  </button>
+  <button
+    wx:if="{{!editIsNew}}"
+    class="btn btn-danger"
+    style="margin-top: 12rpx;"
+    bindtap="deleteEdit"
+    disabled="{{editSaving}}"
+  >
+    删除当天班次
+  </button>
+  <button class="btn btn-ghost" style="margin-top: 12rpx;" bindtap="closeEdit">取消</button>
+
+  <view class="muted" style="margin-top: 16rpx;">
+    修改只影响小程序内的班表；系统日历无法由小程序修改，请手动删除旧日程后重新添加。
+  </view>
+</view>

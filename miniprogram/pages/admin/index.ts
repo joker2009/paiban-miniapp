@@ -1,4 +1,4 @@
-import { getMe } from '../../services/auth';
+import { getMe, ensureTestSetup } from '../../services/auth';
 import { listJobs } from '../../services/importJob';
 import { listHistory } from '../../services/release';
 import { today, mondayOf, addDays, displayDate, dateRange } from '../../utils/date';
@@ -36,6 +36,8 @@ Page({
     jobs: [] as JobView[],
     currentVersion: 0,
     lastPublishedAt: '',
+    enablingTest: false,
+    testSetupMsg: '',
   },
 
   _me: null as MeInfo | null,
@@ -152,6 +154,33 @@ Page({
     wx.navigateTo({
       url: `/pages/admin/review/index?jobId=${jobid}&teamId=${this.data.teamId}&weekStart=${this.data.weekStart}`,
     });
+  },
+
+  /** 开发测试用：无管理员时一键建团队/管理员/员工绑定/示例班次 */
+  async onEnableTestSetup() {
+    if (this.data.enablingTest) return;
+    const confirmed = await new Promise<boolean>((resolve) => {
+      wx.showModal({
+        title: '开启测试环境',
+        content: '将自动创建「测试团队」、管理员、一条员工记录与示例班次。仅用于开发测试。',
+        success: (r) => resolve(r.confirm),
+      });
+    });
+    if (!confirmed) return;
+
+    this.setData({ enablingTest: true, testSetupMsg: '' });
+    try {
+      const res = await ensureTestSetup({ name: '测试员工', adminName: '管理员' });
+      this.setData({
+        testSetupMsg: `已就绪：${res.teamName} / ${res.name}（${res.employeeNo}）`,
+      });
+      wx.showToast({ title: '测试环境已就绪', icon: 'success' });
+      await this.init();
+    } catch (e) {
+      toastError(e, '初始化失败');
+    } finally {
+      this.setData({ enablingTest: false });
+    }
   },
 
   retry() {

@@ -12,6 +12,7 @@ const C = {
   cells: 'pb_draftCells',
   employees: 'pb_employees',
   shiftTypes: 'pb_shiftTypes',
+  tasks: 'pb_ocr_tasks',
 };
 
 
@@ -64,21 +65,21 @@ function mimeOf(buf, fileID) {
   return 'image/jpeg';
 }
 
-function buildPrompt(job) {
-  const dates = weekDates(job.weekStart);
-  const list = dates.map((d, i) => `${d}（${WEEK_LABELS[i]}）`).join('、');
+function buildPrompt(weekStart) {
+  const year = weekStart.slice(0, 4);
   return [
-    '你是排班表识别器。输入是一张团队周排班表图片，只输出 JSON，不要输出任何解释或 Markdown 代码块。',
-    `本周（周一至周日）为：${list}。表头可能只写月/日或星期，请按这个周推断完整日期。`,
-    '输出结构：',
-    '{"employees":[{"employeeNo":"字符串，保留前导零","name":"姓名","cells":[{"date":"YYYY-MM-DD","text":"该单元格原文，空白则为空字符串","confidence":0到1的小数,"rect":{"x":0,"y":0,"w":0,"h":0}}]}],"notes":""}',
+    '你是排班表识别器。输入是一张排班表图片，只输出 JSON，不要输出任何解释或 Markdown 代码块。',
+    '请先读取图片表头中的日期，再按列顺序输出。',
+    '输出结构（尽量紧凑，不要额外字段）：',
+    '{"dates":["YYYY-MM-DD","..."],"employees":[{"employeeNo":"工号字符串，保留前导零","name":"姓名","cells":["该列班次原文或空字符串","..."]}]}',
     '规则：',
-    `1. 每个员工必须输出 7 个 cells，date 依次覆盖 ${dates.join('、')}；空白单元格也输出空 text。`,
-    '2. employeeNo 必须是图片中的工号字符串，不要自行补零或改号；姓名仅作参考。',
-    '3. text 只保留图片中该格的班次原文或符号，不要翻译、不要猜测、不要补全。',
-    '4. 不要把表头、组名、分隔行、备注、加班或欠休列当成班次；每个人一行。',
-    '5. rect 为该单元格在原图中的像素矩形（原点左上角），如无法估计可省略。',
-    '6. 看不清就如实输出空 text 或较低 confidence，不要编造。',
+    '1. dates 必须来自图片表头，按从左到右的列顺序；绝对不要使用任何用户提供的周次。',
+    '2. 表头只有月/日时，年份按 ' + year + ' 推断；dates 数量 = 表头日期列数。',
+    '3. 每个员工的 cells 数量与 dates 完全一致，按同一列顺序；空白列写空字符串。',
+    '4. employeeNo 必须来自图片，不要自行补零或改号；姓名仅作参考。',
+    '5. text 只保留该格班次原文或符号，不翻译、不猜测。',
+    '6. 每人一行；忽略组名、分隔行、备注、加班和欠休列。',
+    '7. 看不清就输出空字符串，不要编造。',
   ].join('\n');
 }
 
@@ -93,13 +94,112 @@ async function recognizeImage(job, image, pageIndex) {
       {
         role: 'user',
         content: [
-          { type: 'text', text: buildPrompt(job) },
-          { type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } },
+          { type: 'text', text: buildPrompt(job.weekStart) },
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${b64}`, detail: 'high' } },
         ],
       },
     ],
   });
   return parseRecognition(text);
+}
+
+/**
+ * 员工自助识别：传入一张图，同步返回结构化行，不落库。
+ */
+async function recognizeFile(fileID, weekStart) {
+  if (!fileID || !weekStart) throw new Error('INVALID_ARGUMENT');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) throw new Error('INVALID_WEEK');
+
+  const dl = await cloud.downloadFile({ fileID });
+  const buf = dl.fileContent;
+  if (!buf || buf.length === 0) throw new Error('EMPTY_FILE');
+  const maxBytes = Number(process.env.MAX_IMAGE_BYTES || 10 * 1024 * 1024);
+  if (buf.length > maxBytes) throw new Error('FILE_TOO_LARGE');
+
+  const mime = mimeOf(buf, fileID);
+  const b64 = buf.toString('base64');
+  const text = await chatVision({
+    messages: [
+      { role: 'system', content: '你只输出严格 JSON，不输出任何其他文字。' },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: buildPrompt(weekStart) },
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${b64}`, detail: 'high' } },
+        ],
+      },
+    ],
+  });
+
+  const parsed = parseRecognition(text);
+
+  // 表头日期优先；模型逐格日期作为补充
+  const headerDates = (parsed.dates || [])
+    .map((d) => completeDate(d, weekStart))
+    .filter(Boolean);
+  const dateSet = new Set(headerDates);
+  for (const row of parsed.rows) for (const c of row.cells) {
+    const d = completeDate(c.date, weekStart);
+    if (d) dateSet.add(d);
+  }
+  const dates = dateSet.size > 0 ? Array.from(dateSet).sort() : weekDates(weekStart);
+
+  const rows = parsed.rows.map((row) => ({
+    employeeNo: row.employeeNo || '',
+    name: row.name || '',
+    cells: (row.cells || []).map((c, i) => ({
+      date: completeDate(c.date, weekStart) || headerDates[i] || dates[i] || null,
+      text: c.text || '',
+      confidence: c.confidence,
+    })),
+  }));
+
+  return { weekStart, dates, rows, notes: parsed.notes || '' };
+}
+
+/**
+ * 处理异步识别任务：结果写回 pb_ocr_tasks。
+ * 由 API 即时唤起或定时触发器轮询。
+ */
+async function processTask(taskId) {
+  if (!taskId) return { error: 'missing taskId' };
+  const claim = await db
+    .collection(C.tasks)
+    .where({ _id: taskId, status: 'PENDING' })
+    .update({ data: { status: 'RUNNING', updatedAt: new Date() } });
+  if (!claim.stats || claim.stats.updated === 0) return { skipped: true };
+
+  const doc = await db.collection(C.tasks).doc(taskId).get().catch(() => null);
+  if (!doc || !doc.data) return { error: 'task missing' };
+  const task = doc.data;
+
+  try {
+    const data = await recognizeFile(task.fileID, task.weekStart);
+    await db.collection(C.tasks).doc(taskId).update({
+      data: {
+        status: 'DONE',
+        dates: data.dates,
+        rows: data.rows,
+        notes: data.notes,
+        error: null,
+        updatedAt: new Date(),
+      },
+    });
+    return { status: 'DONE', rows: data.rows.length };
+  } catch (e) {
+    const msg = String((e && e.message) || '识别失败').slice(0, 200);
+    console.error('[ocr] task failed', taskId, msg);
+    const friendly = publicError(msg);
+    await db.collection(C.tasks).doc(taskId).update({
+      data: {
+        status: 'FAILED',
+        error: friendly,
+        detail: msg,
+        updatedAt: new Date(),
+      },
+    });
+    return { status: 'FAILED', error: friendly };
+  }
 }
 
 async function loadShiftMap(teamId) {
@@ -128,17 +228,43 @@ async function loadEmployees(teamId) {
   return map;
 }
 
-function completeDate(rawDate, weekStart) {
+/**
+ * 把模型输出的日期补全为 YYYY-MM-DD。
+ * 以图片表头为准，允许超出所选周；只有月/日时按参考日期年份就近推断。
+ */
+function completeDate(rawDate, refDate) {
   if (!rawDate) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) return rawDate;
-  const m = /^(\d{1,2})[-/.](\d{1,2})$/.exec(rawDate);
+  const s = String(rawDate).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return isValidDateStr(s) ? s : null;
+
+  const m = /^(\d{1,2})[-/.](\d{1,2})$/.exec(s) || /^(\d{1,2})月(\d{1,2})日?$/.exec(s);
   if (!m) return null;
-  const year = Number(weekStart.slice(0, 4));
-  const candidate = `${year}-${pad(Number(m[1]))}-${pad(Number(m[2]))}`;
-  const dates = weekDates(weekStart);
-  if (dates.includes(candidate)) return candidate;
-  const alt = `${year + 1}-${pad(Number(m[1]))}-${pad(Number(m[2]))}`;
-  return dates.includes(alt) ? alt : null;
+
+  const month = Number(m[1]);
+  const day = Number(m[2]);
+  const refYear = Number(refDate.slice(0, 4));
+  const refTs = Date.parse(`${refDate}T00:00:00Z`);
+
+  let best = null;
+  let bestDiff = Infinity;
+  for (const y of [refYear - 1, refYear, refYear + 1]) {
+    const candidate = `${y}-${pad(month)}-${pad(day)}`;
+    if (!isValidDateStr(candidate)) continue;
+    const diff = Math.abs(Date.parse(`${candidate}T00:00:00Z`) - refTs);
+    if (diff < bestDiff) {
+      best = candidate;
+      bestDiff = diff;
+    }
+  }
+  return best;
+}
+
+function isValidDateStr(s) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
 
 /** 识别结果 → 草稿单元格（含异常标记） */
@@ -162,8 +288,9 @@ function buildCells(job, pageIndex, parsed, ctx) {
 
     const dateSeen = new Set();
 
-    for (const c of row.cells) {
-      const workDate = completeDate(c.date, job.weekStart);
+    row.cells.forEach((c, cellIdx) => {
+      const headerDate = (parsed.dates || [])[cellIdx];
+      const workDate = completeDate(c.date || headerDate, job.weekStart);
       const rawText = (c.text || '').trim();
       const issues = [];
 
@@ -204,7 +331,7 @@ function buildCells(job, pageIndex, parsed, ctx) {
         status: issues.length === 0 ? 'MATCHED' : 'NEEDS_REVIEW',
         issues,
       });
-    }
+    });
 
     // 模型漏掉的日期补成待校对空白单元格
     for (const d of dates) {
@@ -459,6 +586,25 @@ async function poll() {
     }
   }
 
+  // 回收卡住的识别任务
+  await db
+    .collection(C.tasks)
+    .where({ status: 'RUNNING', updatedAt: _.lt(new Date(Date.now() - 5 * 60 * 1000)) })
+    .update({ data: { status: 'PENDING' } })
+    .catch(() => {});
+
+  // 每次只处理一个任务，避免超过函数超时
+  const taskRes = await safeGet(
+    db.collection(C.tasks).where({ status: 'PENDING' }).orderBy('createdAt', 'asc').limit(1)
+  );
+  for (const t of taskRes.data) {
+    try {
+      results.push(await processTask(t._id));
+    } catch (e) {
+      console.error('[ocr] process task failed', t._id, e && e.message);
+    }
+  }
+
   await cleanupExpiredOriginals();
   return results;
 }
@@ -500,6 +646,31 @@ async function cleanupExpiredOriginals() {
 exports.main = async (event) => {
   const isTimer = event && (event.Type === 'Timer' || event.TriggerName === 'ocrPoller');
   const token = process.env.INTERNAL_TOKEN || '';
+
+  // 异步任务：处理一条识别任务并写回结果
+  if (event && event.action === 'recognizeTask') {
+    if (!token || event.token !== token) {
+      return { ok: false, code: 'FORBIDDEN', message: 'token 不匹配' };
+    }
+    const result = await processTask(event.taskId);
+    return { ok: true, result };
+  }
+
+  // 员工自助：同步识别（用于调试，生产走 recognizeTask）
+  if (event && event.action === 'recognize') {
+    if (!token || event.token !== token) {
+      return { ok: false, code: 'FORBIDDEN', message: 'token 不匹配' };
+    }
+    try {
+      const data = await recognizeFile(event.fileID, event.weekStart);
+      return { ok: true, data };
+    } catch (e) {
+      const msg = String((e && e.message) || '识别失败').slice(0, 200);
+      console.error('[ocr] recognize failed', msg);
+      return { ok: false, code: 'OCR_FAILED', message: publicError(msg) };
+    }
+  }
+
   const authorized = isTimer || (token && event && event.token === token);
 
   if (!authorized) {

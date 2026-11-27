@@ -1,0 +1,36 @@
+<view class="page">
+  <view class="card">
+    <view class="title">个人信息</view>
+    <view class="subtitle">识别排班图后，会优先用这里的姓名在名单里匹配你。</view>
+
+    <view class="form-item" style="margin-top: 24rpx;">
+      <text class="form-label">姓名</text>
+      <input
+        class="input"
+        placeholder="例如 张三"
+        value="{{name}}"
+        data-field="name"
+        bindinput="onField"
+      />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">工号（可选，用于更精确匹配）</text>
+      <input
+        class="input"
+        placeholder="例如 0001"
+        value="{{employeeNo}}"
+        data-field="employeeNo"
+        bindinput="onField"
+      />
+    </view>
+
+    <button class="btn" bindtap="save" loading="{{saving}}" disabled="{{saving || loading}}">
+      保存
+    </button>
+  </view>
+
+  <view class="muted" style="padding: 0 12rpx;">
+    同名较多时建议填写工号；识别结果仍可手动改选。
+  </view>
+</view>

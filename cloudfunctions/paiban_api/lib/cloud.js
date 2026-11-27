@@ -19,6 +19,9 @@ const COLLECTIONS = {
   weekPointers: 'pb_weekPointers',
   auditLogs: 'pb_auditLogs',
   idempotency: 'pb_idempotency',
+  personalSchedules: 'pb_personal_schedules',
+  userProfiles: 'pb_user_profiles',
+  ocrTasks: 'pb_ocr_tasks',
 };
 
 /** 集合不存在（首次运行、尚未创建任何数据） */
@@ -81,6 +84,43 @@ async function getPage(query, { cursor = null, pageSize = 50 } = {}) {
   return { items, nextCursor };
 }
 
+let ensurePromise = null;
+
+/**
+ * 确保所有业务集合存在（云数据库 add 不会自动建集合）。
+ * 每个实例只执行一次；已存在的集合忽略。
+ */
+async function ensureCollections() {
+  if (!ensurePromise) {
+    ensurePromise = (async () => {
+      const names = Object.values(COLLECTIONS);
+      const failures = [];
+      await Promise.all(
+        names.map(async (name) => {
+          try {
+            await db.createCollection(name);
+          } catch (err) {
+            const code = err && (err.errCode || err.code);
+            const msg = String((err && (err.errMsg || err.message)) || '');
+            if (!(code === -501001 || /exist|已存在/i.test(msg))) {
+              failures.push(`${name}: ${msg}`);
+            }
+          }
+        })
+      );
+      if (failures.length > 0) {
+        console.warn('[cloud] ensureCollections 部分失败', failures);
+      }
+      return true;
+    })().catch((err) => {
+      ensurePromise = null;
+      console.warn('[cloud] ensureCollections 异常', err && err.message);
+      return false;
+    });
+  }
+  return ensurePromise;
+}
+
 module.exports = {
   cloud,
   db,
@@ -91,4 +131,5 @@ module.exports = {
   safeGet,
   safeCount,
   isCollectionNotExist,
+  ensureCollections,
 };

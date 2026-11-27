@@ -1,35 +1,15 @@
 {
   "pages": [
-    "pages/schedule/index",
-    "pages/admin/index",
-    "pages/bind/index",
-    "pages/admin/import/index",
-    "pages/admin/review/index",
-    "pages/admin/shifts/index",
-    "pages/admin/members/index"
+    "pages/calendar/index",
+    "pages/import/index",
+    "pages/settings/index"
   ],
   "window": {
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#1f6feb",
-    "navigationBarTitleText": "排班助手",
+    "navigationBarTitleText": "我的班表",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#f5f6f8"
-  },
-  "tabBar": {
-    "color": "#8a8f99",
-    "selectedColor": "#1f6feb",
-    "backgroundColor": "#ffffff",
-    "borderStyle": "black",
-    "list": [
-      {
-        "pagePath": "pages/schedule/index",
-        "text": "我的排班"
-      },
-      {
-        "pagePath": "pages/admin/index",
-        "text": "排班管理"
-      }
-    ]
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json",
