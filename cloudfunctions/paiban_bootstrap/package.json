@@ -1,9 +1,6 @@
 {
-  "name": "paiban-bootstrap",
+  "name": "paiban-bootstrap-disabled",
   "version": "1.0.0",
   "private": true,
-  "main": "index.js",
-  "dependencies": {
-    "wx-server-sdk": "^4.0.2"
-  }
+  "main": "index.js"
 }
