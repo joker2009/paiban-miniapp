@@ -179,4 +179,99 @@ async function bindSelf(payload) {
   return { employeeId, teamId: emp.teamId };
 }
 
-module.exports = { getMe, bindInvite, listBindableEmployees, bindSelf };
+/**
+ * 管理员一键创建员工并绑定自己（开发/初始化阶段免邀请码）。
+ * 自动生成工号；也可指定 employeeNo。
+ */
+async function createSelfEmployee(payload) {
+  const name = str(payload.name, '姓名', { min: 1, max: 32 });
+  const identity = await getIdentity();
+  if (identity.adminTeams.length === 0) throw ERR.FORBIDDEN('无管理权限');
+
+  if (identity.binding) {
+    const empDoc = await db
+      .collection(COLLECTIONS.employees)
+      .doc(identity.binding.employeeId)
+      .get()
+      .catch(() => null);
+    if (empDoc && empDoc.data) {
+      return {
+        employeeId: identity.binding.employeeId,
+        teamId: empDoc.data.teamId,
+        employeeNo: empDoc.data.employeeNo,
+        name: empDoc.data.name,
+        already: true,
+      };
+    }
+  }
+
+  const team = identity.adminTeams[0];
+  let employeeNo = payload.employeeNo
+    ? str(payload.employeeNo, '工号', { min: 1, max: 32 })
+    : '';
+
+  if (employeeNo) {
+    const dup = await safeGet(
+      db.collection(COLLECTIONS.employees).where({ teamId: team.teamId, employeeNo }).limit(1)
+    );
+    if (dup.data.length > 0) throw ERR.CONFLICT('该工号已存在');
+  } else {
+    const all = await safeGet(
+      db.collection(COLLECTIONS.employees).where({ teamId: team.teamId }).limit(500)
+    );
+    const nums = all.data
+      .map((e) => Number(e.employeeNo))
+      .filter((n) => Number.isInteger(n) && n >= 0);
+    let next = (nums.length ? Math.max(...nums) : 0) + 1;
+    for (let i = 0; i < 50; i += 1) {
+      const candidate = String(next + i).padStart(4, '0');
+      const dup = await safeGet(
+        db.collection(COLLECTIONS.employees).where({ teamId: team.teamId, employeeNo: candidate }).limit(1)
+      );
+      if (dup.data.length === 0) {
+        employeeNo = candidate;
+        break;
+      }
+    }
+    if (!employeeNo) employeeNo = `A${Date.now().toString().slice(-6)}`;
+  }
+
+  const teamDoc = await db.collection(COLLECTIONS.teams).doc(team.teamId).get();
+  const now = new Date();
+  const added = await db.collection(COLLECTIONS.employees).add({
+    data: {
+      orgId: teamDoc.data.orgId,
+      teamId: team.teamId,
+      employeeNo,
+      name,
+      status: 'ACTIVE',
+      createdAt: now,
+      updatedAt: now,
+    },
+  });
+
+  await db.collection(COLLECTIONS.bindings).add({
+    data: {
+      appId: identity.appId,
+      openid: identity.openid,
+      employeeId: added._id,
+      orgId: teamDoc.data.orgId,
+      teamId: team.teamId,
+      status: 'ACTIVE',
+      boundBy: 'admin-self-create',
+      boundAt: now,
+      createdAt: now,
+    },
+  });
+
+  return {
+    employeeId: added._id,
+    teamId: team.teamId,
+    teamName: team.teamName,
+    employeeNo,
+    name,
+    created: true,
+  };
+}
+
+module.exports = { getMe, bindInvite, listBindableEmployees, bindSelf, createSelfEmployee };

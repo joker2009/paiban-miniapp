@@ -28,3 +28,11 @@ export function listBindableEmployees(): Promise<{ items: BindableEmployee[] }> 
 export function bindSelf(employeeId: string): Promise<{ employeeId: string; teamId: string }> {
   return call('auth.bindSelf', { employeeId });
 }
+
+/** 管理员一键创建员工并绑定自己（免邀请码） */
+export function createSelfEmployee(input: {
+  name: string;
+  employeeNo?: string;
+}): Promise<{ employeeId: string; teamId: string; employeeNo: string; name: string }> {
+  return call('auth.createSelfEmployee', input);
+}

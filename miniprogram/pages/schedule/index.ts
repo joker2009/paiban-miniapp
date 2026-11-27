@@ -2,6 +2,7 @@ import {
   getMe,
   listBindableEmployees,
   bindSelf,
+  createSelfEmployee,
   type BindableEmployee,
 } from '../../services/auth';
 import { getMine } from '../../services/schedule';
@@ -80,6 +81,11 @@ Page({
     adminEmployees: [] as BindableOption[],
     adminEmpIndex: 0,
     bindingSelf: false,
+    isAdmin: false,
+    showSelfCreate: false,
+    selfName: '',
+    selfNo: '',
+    creatingSelf: false,
   },
 
   _me: null as MeInfo | null,
@@ -105,7 +111,11 @@ Page({
 
       if (!me.employee) {
         await this.loadAdminBindOptions(me);
-        this.setData({ loading: false, bound: false });
+        this.setData({
+          loading: false,
+          bound: false,
+          isAdmin: (me.adminTeams || []).length > 0,
+        });
         return;
       }
 
@@ -142,6 +152,39 @@ Page({
 
   onAdminEmpChange(e: WechatMiniprogram.PickerChange) {
     this.setData({ adminEmpIndex: Number(e.detail.value) });
+  },
+
+  toggleSelfCreate() {
+    this.setData({ showSelfCreate: !this.data.showSelfCreate });
+  },
+
+  onSelfField(e: WechatMiniprogram.Input) {
+    const field = String(e.currentTarget.dataset.field);
+    this.setData({ [field]: e.detail.value });
+  },
+
+  async onCreateSelfEmployee() {
+    const name = this.data.selfName.trim();
+    if (!name) {
+      wx.showToast({ title: '请输入姓名', icon: 'none' });
+      return;
+    }
+    if (this.data.creatingSelf) return;
+
+    this.setData({ creatingSelf: true });
+    try {
+      await createSelfEmployee({
+        name,
+        employeeNo: this.data.selfNo.trim() || undefined,
+      });
+      wx.showToast({ title: '已创建并绑定', icon: 'success' });
+      this.setData({ showSelfCreate: false, selfName: '', selfNo: '' });
+      await this.load();
+    } catch (e) {
+      toastError(e, '创建失败');
+    } finally {
+      this.setData({ creatingSelf: false });
+    }
   },
 
   async onBindSelf() {

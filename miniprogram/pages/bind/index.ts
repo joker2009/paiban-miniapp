@@ -8,6 +8,7 @@ Page({
     state: 'CHECKING' as 'CHECKING' | 'FORM' | 'BOUND' | 'ERROR',
     employeeText: '',
     errorMsg: '',
+    isAdmin: false,
   },
 
   onShow() {
@@ -27,7 +28,7 @@ Page({
           employeeText: `${me.employee.name}（工号 ${me.employee.employeeNo}）· ${me.employee.teamName}`,
         });
       } else {
-        this.setData({ state: 'FORM' });
+        this.setData({ state: 'FORM', isAdmin: (me.adminTeams || []).length > 0 });
       }
     } catch (e: any) {
       this.setData({ state: 'ERROR', errorMsg: e?.message || '加载失败' });
@@ -42,6 +43,10 @@ Page({
     const code = this.data.code;
     if (!code) {
       wx.showToast({ title: '请输入邀请码', icon: 'none' });
+      return;
+    }
+    if (code.length < 6) {
+      wx.showToast({ title: '邀请码长度不正确', icon: 'none' });
       return;
     }
     if (this.data.submitting) return;
@@ -60,6 +65,11 @@ Page({
   },
 
   goSchedule() {
+    wx.switchTab({ url: '/pages/schedule/index' });
+  },
+
+  /** 管理员不需要邀请码：回「我的排班」选择员工记录自助绑定 */
+  goAdminSelfBind() {
     wx.switchTab({ url: '/pages/schedule/index' });
   },
 

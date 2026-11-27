@@ -8,6 +8,13 @@
   margin-top: 24rpx;
 }
 
+.link {
+  margin-top: 20rpx;
+  text-align: center;
+  color: var(--brand);
+  font-size: 26rpx;
+}
+
 .next-card {
   background: linear-gradient(135deg, #1f6feb, #3f8cff);
   color: #fff;

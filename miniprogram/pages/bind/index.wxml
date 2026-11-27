@@ -18,9 +18,17 @@
   </view>
 
   <block wx:else>
+    <view class="notice" wx:if="{{isAdmin}}">
+      <view>你是管理员，不需要邀请码。</view>
+      <view class="muted" style="margin-top: 8rpx;">回「我的排班」选择一条员工记录即可直接绑定自己。</view>
+      <button class="btn btn-secondary btn-sm" style="margin-top: 16rpx;" bindtap="goAdminSelfBind">
+        去自助绑定
+      </button>
+    </view>
+
     <view class="card">
       <view class="title">绑定个人排班</view>
-      <view class="subtitle">请输入管理员单独发给你的邀请码</view>
+      <view class="subtitle">请输入管理员在「成员管理」中发放的邀请码</view>
       <input
         class="input"
         style="margin-top: 24rpx;"
@@ -43,7 +51,7 @@
       </button>
     </view>
     <view class="muted" style="padding: 0 12rpx;">
-      邀请码一次有效，默认 48 小时内有效。输入工号或姓名无法完成绑定。
+      邀请码一次有效，默认 48 小时内有效。BOOTSTRAP_TOKEN 不是邀请码，不能在页面里使用。
     </view>
   </block>
 </view>

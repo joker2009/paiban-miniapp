@@ -7,6 +7,7 @@ const handlers = {
   'auth.bindInvite': require('./handlers/auth').bindInvite,
   'auth.listBindableEmployees': require('./handlers/auth').listBindableEmployees,
   'auth.bindSelf': require('./handlers/auth').bindSelf,
+  'auth.createSelfEmployee': require('./handlers/auth').createSelfEmployee,
 
   'admin.listEmployees': require('./handlers/admin').listEmployees,
   'admin.saveEmployee': require('./handlers/admin').saveEmployee,

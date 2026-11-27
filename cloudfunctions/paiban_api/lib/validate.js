@@ -3,8 +3,9 @@ const { ERR } = require('./errors');
 function str(v, field, { min = 1, max = 200 } = {}) {
   if (typeof v !== 'string') throw ERR.INVALID_ARGUMENT(`${field} 必须是字符串`);
   const s = v.trim();
-  if (s.length < min) throw ERR.INVALID_ARGUMENT(`${field} 不能为空`);
-  if (s.length > max) throw ERR.INVALID_ARGUMENT(`${field} 过长`);
+  if (!s) throw ERR.INVALID_ARGUMENT(`${field} 不能为空`);
+  if (s.length < min) throw ERR.INVALID_ARGUMENT(`${field} 长度至少 ${min} 位`);
+  if (s.length > max) throw ERR.INVALID_ARGUMENT(`${field} 长度不能超过 ${max} 位`);
   return s;
 }
 
